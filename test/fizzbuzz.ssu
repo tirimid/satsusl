@@ -1,0 +1,35 @@
+import console;
+
+func void
+fizzbuzz(int n)
+{
+	var string accum = "";
+	
+	if (n % 3 == 0)
+	{
+		accum += "fizz";
+	}
+	if (n % 5 == 0)
+	{
+		accum += "buzz";
+	}
+	
+	if (len(accum) == 0)
+	{
+		console.println("${n}");
+	}
+	else
+	{
+		console.println(accum);
+	}
+}
+
+func int
+start()
+{
+	for (var int i = 0; i < 100; i += 1)
+	{
+		fizzbuzz(i);
+	}
+	return 0;
+}

@@ -1,0 +1,7 @@
+// the following types are legal in Satsu SL:
+//
+// int      integer data
+// real     real-valued data
+// string   textual data
+// bool     boolean data
+// void     non-data type

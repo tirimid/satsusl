@@ -3,7 +3,7 @@
 INCLUDE="-Icsatsu"
 DEFINES=""
 WARNINGS="-Wall -Wextra -Wshadow"
-LIBRARIES=""
+LIBRARIES="-L. -lsatsu-bin"
 CFLAGS="-std=c99 -pedantic -O3"
 
 CC=gcc

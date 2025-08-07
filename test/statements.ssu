@@ -1,0 +1,61 @@
+// module inclusion.
+import console;
+
+// function declaration.
+func int
+start()
+{
+	// variable declaration.
+	var int n = 100;
+	
+	// expression statement.
+	n += 1;
+	
+	// block.
+	{
+		// ...
+	}
+	
+	// selection.
+	if (n == 1)
+	{
+		// ...
+	}
+	else if (n == 2)
+	{
+		// ...
+	}
+	else
+	{
+		// ...
+	}
+	
+	// conditional loop.
+	while (n < 1000)
+	{
+		if (n == 200)
+		{
+			n += 1;
+			
+			// skip iteration.
+			continue;
+		}
+		
+		if (n == 600)
+		{
+			// early exit.
+			break;
+		}
+		
+		n += 1;
+	}
+	
+	// augmented conditional loop.
+	for (var int i = 0; i < n; i += 1)
+	{
+		// ...
+	}
+	
+	// value return.
+	return 0;
+}

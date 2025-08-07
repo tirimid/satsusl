@@ -1,0 +1,43 @@
+// operators are presented in descending precedence.
+//
+// left-to-right
+// ()      function call
+// .       module access
+//
+// right-to-left
+// -       unary minus
+// !       logical NOT
+// $       environment variable access
+//
+// left-to-right
+// *       multiplication
+// /       division
+// %       modulo
+//
+// left-to-right
+// +       addition
+// -       subtraction
+//
+// left-to-right
+// <       less
+// <=      lequal
+// >       greater
+// >=      grequal
+// ==      equal
+// !=      nequal
+//
+// left-to-right
+// &&      logical AND
+// ||      logical OR
+// ^^      logical XOR
+//
+// right-to-left
+// ?:      tenary conditional
+//
+// right-to-left
+// =       assign
+// +=      add and assign
+// -=      subtract and assign
+// *=      multiply and assign
+// /=      divide and assign
+// %=      modulo and assign

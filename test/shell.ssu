@@ -1,0 +1,13 @@
+import shell;
+
+func int
+start()
+{
+	var string homedir = $"HOME";
+	
+	$("cp", "${homedir}/src", "${homedir}/dst");
+	
+	shell.run("mkdir ${homedir}/trashbin");
+	
+	return 0;
+}
