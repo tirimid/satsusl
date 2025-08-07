@@ -9,13 +9,14 @@ extern "C"
 #endif
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 
-// utility types.
-typedef int32_t ls_err_t;
+//--------------------//
+// enumeration values //
+//--------------------//
 
-// enumeration values.
 typedef enum ls_toktype
 {
 	LS_IDENT = 0,
@@ -84,21 +85,29 @@ typedef enum ls_nodetype
 	LS_NODETYPE_END
 } ls_nodetype_t;
 
-// data structures.
+//-----------------//
+// data structures //
+//-----------------//
+
+typedef struct ls_err
+{
+	int32_t code;
+	uint32_t pos, len;
+	char *src;
+	char *msg;
+} ls_err_t;
+
 typedef struct ls_tok
 {
 	uint32_t pos, len;
 } ls_tok_t;
 
-typedef struct ls_lexfile
+typedef struct ls_lex
 {
-	char *name;
-	char *conts;
-	size_t len;
 	ls_tok_t *toks;
 	uint8_t *types;
 	size_t ntoks, tokcap;
-} ls_lexfile_t;
+} ls_lex_t;
 
 typedef struct ls_node
 {
@@ -114,23 +123,37 @@ typedef struct ls_ast
 	size_t nnodes, nodecap;
 } ls_ast_t;
 
-// library configuration.
+//-----------------------//
+// library configuration //
+//-----------------------//
+
 extern void *(*ls_calloc)(size_t, size_t);
 extern void *(*ls_reallocarray)(void *, size_t, size_t);
 extern void (*ls_free)(void *);
+extern char *(*ls_strdup)(char const *);
 
-// data tables.
+//-------------//
+// data tables //
+//-------------//
+
 extern char const *ls_toknames[LS_TOKTYPE_END];
 extern char const *ls_nodenames[LS_NODETYPE_END];
 
-// lex procedures.
-ls_err_t ls_lexfile(ls_lexfile_t *out, char const *file);
-ls_err_t ls_lex(l_lexfile_t *out, char const *name, char const *data, size_t len);
-char *ls_readraw(ls_lexfile_t const *l, uint32_t pos, uint32_t len);
-char *ls_readstr(ls_lexfile_t const *l, uint32_t pos, uint32_t len);
+//------------//
+// procedures //
+//------------//
 
-// parse procedures.
-ls_err_t ls_parse(ls_ast_t *out, ls_lexfile_t const *l);
+// util.
+void ls_destroyerr(ls_err_t *err);
+void ls_destroylex(ls_lex_t *l);
+
+// lex.
+ls_err_t ls_lexfile(ls_lex_t *out, FILE *fp, char const *name);
+ls_err_t ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len);
+void ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len);
+
+// parse.
+ls_err_t ls_parse(ls_ast_t *out, ls_lex_t const *l);
 
 #ifdef __cplusplus
 }

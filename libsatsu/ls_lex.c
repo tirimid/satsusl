@@ -61,22 +61,297 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	"%="
 };
 
-ls_err_t
-ls_lexfile(ls_lexfile_t *out, char const *file)
-{
-}
+static void ls_lexword(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
+static void ls_lexstr(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
+static void ls_lexnum(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
+static void ls_lexcomment(char const *data, uint32_t len, size_t *i);
 
 ls_err_t
-ls_lex(ls_lexfile_t *out, char const *name, char const *data, size_t len)
+ls_lexfile(ls_lex_t *out, FILE *fp, char const *name)
 {
+	fseek(fp, 0, SEEK_END);
+	ssize_t len = ftell(fp);
+	if (len < 0)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = ls_strdup(name),
+			.msg = ls_strdup("failed to get file size")
+		};
+	}
+	
+	if (len >= UINT32_MAX)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = ls_strdup(name),
+			.msg = ls_strdup("file is too big to lex")
+		};
+	}
+	
+	char *conts = ls_calloc(len, 1);
+	fseek(fp, 0, SEEK_SET);
+	if (fread(conts, 1, len, fp) != (size_t)len)
+	{
+		ls_free(conts);
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = ls_strdup(name),
+			.msg = ls_strdup("failed to read file")
+		};
+	}
+	
+	return ls_lex(out, name, conts, len);
 }
 
-char *
-ls_readraw(ls_lexfile_t const *l, uint32_t pos, uint32_t len)
+ls_err_t
+ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 {
+	ls_lex_t l =
+	{
+		.toks = ls_calloc(1, sizeof(ls_tok_t)),
+		.types = ls_calloc(1, 1),
+		.tokcap = 1
+	};
+	
+	for (size_t i = 0; i < len; ++i)
+	{
+		if (isspace(data[i]))
+		{
+			continue;
+		}
+		else if (isalpha(data[i]) || data[i] == '_')
+		{
+			ls_lexword(&l, name, data, len, &i);
+		}
+		else if (data[i] == '"')
+		{
+			ls_lexstr(&l, name, data, len, &i);
+		}
+		else if (isdigit(data[i]))
+		{
+			ls_lexnum(&l, name, data, len, &i);
+		}
+		else if (!strncmp(&data[i], "//", 2))
+		{
+			ls_lexcomment(data, len, &i);
+		}
+		else if (data[i] == '(')
+		{
+			ls_addtok(&l, LS_LPAREN, i, 1);
+		}
+		else if (data[i] == ')')
+		{
+			ls_addtok(&l, LS_RPAREN, i, 1);
+		}
+		else if (data[i] == '.')
+		{
+			ls_addtok(&l, LS_PERIOD, i, 1);
+		}
+		else if (!strncmp(&data[i], "-=", 2))
+		{
+			ls_addtok(&l, LS_MINUSEQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '-')
+		{
+			ls_addtok(&l, LS_MINUS, i, 1);
+		}
+		else if (!strncmp(&data[i], "!=", 2))
+		{
+			ls_addtok(&l, LS_BANGEQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '!')
+		{
+			ls_addtok(&l, LS_BANG, i, 1);
+		}
+		else if (data[i] == '$')
+		{
+			ls_addtok(&l, LS_DOLLAR, i, 1);
+		}
+		else if (!strncmp(&data[i], "*=", 2))
+		{
+			ls_addtok(&l, LS_STAREQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '*')
+		{
+			ls_addtok(&l, LS_STAR, i, 1);
+		}
+		else if (!strncmp(&data[i], "/=", 2))
+		{
+			ls_addtok(&l, LS_SLASHEQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '/')
+		{
+			ls_addtok(&l, LS_SLASH, i, 1);
+		}
+		else if (!strncmp(&data[i], "%=", 2))
+		{
+			ls_addtok(&l, LS_PERCENTEQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '%')
+		{
+			ls_addtok(&l, LS_PERCENT, i, 1);
+		}
+		else if (!strncmp(&data[i], "+=", 2))
+		{
+			ls_addtok(&l, LS_PLUSEQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '+')
+		{
+			ls_addtok(&l, LS_PLUS, i, 1);
+		}
+		else if (!strncmp(&data[i], "<=", 2))
+		{
+			ls_addtok(&l, LS_LESSEQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '<')
+		{
+			ls_addtok(&l, LS_LESS, i, 1);
+		}
+		else if (!strncmp(&data[i], ">=", 2))
+		{
+			ls_addtok(&l, LS_GREATEREQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '>')
+		{
+			ls_addtok(&l, LS_GREATER, i, 1);
+		}
+		else if (!strncmp(&data[i], "==", 2))
+		{
+			ls_addtok(&l, LS_2EQUAL, i, 2);
+			++i;
+		}
+		else if (data[i] == '=')
+		{
+			ls_addtok(&l, LS_EQUAL, i, 1);
+		}
+		else if (!strncmp(&data[i], "&&", 2))
+		{
+			ls_addtok(&l, LS_2AMPERSAND, i, 2);
+			++i;
+		}
+		else if (!strncmp(&data[i], "||", 2))
+		{
+			ls_addtok(&l, LS_2PIPE, i, 2);
+			++i;
+		}
+		else if (!strncmp(&data[i], "^^", 2))
+		{
+			ls_addtok(&l, LS_2CARET, i, 2);
+			++i;
+		}
+		else if (data[i] == '?')
+		{
+			ls_addtok(&l, LS_QUESTION, i, 1);
+		}
+		else if (data[i] == ':')
+		{
+			ls_addtok(&l, LS_COLON, i, 1);
+		}
+		else if (data[i] == ';')
+		{
+			ls_addtok(&l, LS_SEMICOLON, i, 1);
+		}
+		else if (data[i] == '{')
+		{
+			ls_addtok(&l, LS_LBRACE, i, 1);
+		}
+		else if (data[i] == '}')
+		{
+			ls_addtok(&l, LS_RBRACE, i, 1);
+		}
+		else
+		{
+			ls_destroylex(&l);
+			return (ls_err_t)
+			{
+				.code = 1,
+				.pos = i,
+				.len = 1,
+				.src = ls_strdup(name),
+				.msg = ls_strdup("unrecognized character")
+			};
+		}
+	}
+	
+	*out = l;
+	return (ls_err_t){0};
 }
 
-char *
-ls_readstr(ls_lexfile_t const *l, uint32_t pos, uint32_t len)
+void
+ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 {
+	if (l->ntoks >= l->tokcap)
+	{
+		l->tokcap *= 2;
+		l->toks = ls_reallocarray(l->toks, l->tokcap, sizeof(ls_tok_t)),
+		l->types = ls_reallocarray(l->types, l->tokcap, 1);
+	}
+	
+	l->toks[l->ntoks] = (ls_tok_t)
+	{
+		.pos = pos,
+		.len = len
+	};
+	l->types[l->ntoks] = type;
+	++l->ntoks;
+}
+
+static void
+ls_lexword(
+	ls_lex_t *l,
+	char const *name,
+	char const *data,
+	uint32_t len,
+	size_t *i
+)
+{
+	// TODO: implement.
+}
+
+static void
+ls_lexstr(
+	ls_lex_t *l,
+	char const *name,
+	char const *data,
+	uint32_t len,
+	size_t *i
+)
+{
+	// TODO: implement.
+}
+
+static void
+ls_lexnum(
+	ls_lex_t *l,
+	char const *name,
+	char const *data,
+	uint32_t len,
+	size_t *i
+)
+{
+	// TODO: implement.
+}
+
+static void
+ls_lexcomment(char const *data, uint32_t len, size_t *i)
+{
+	size_t end = *i;
+	while (end < len && data[end] != '\n')
+	{
+		++end;
+	}
+	
+	*i = end;
 }

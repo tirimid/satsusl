@@ -1,6 +1,6 @@
 #!/bin/bash
 
-INCLUDE="-Icsatsu"
+INCLUDE="-Icsatsu -Ilibsatsu"
 DEFINES=""
 WARNINGS="-Wall -Wextra -Wshadow"
 LIBRARIES="-L. -lsatsu-bin"
