@@ -61,9 +61,9 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	"%="
 };
 
-static void ls_lexword(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
-static void ls_lexstr(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
-static void ls_lexnum(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
+static void ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i);
+static ls_err_t ls_lexstr(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
+static ls_err_t ls_lexnum(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
 static void ls_lexcomment(char const *data, uint32_t len, size_t *i);
 
 ls_err_t
@@ -125,15 +125,25 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		}
 		else if (isalpha(data[i]) || data[i] == '_')
 		{
-			ls_lexword(&l, name, data, len, &i);
+			ls_lexword(&l, data, len, &i);
 		}
 		else if (data[i] == '"')
 		{
-			ls_lexstr(&l, name, data, len, &i);
+			ls_err_t err = ls_lexstr(&l, name, data, len, &i);
+			if (err.code)
+			{
+				ls_destroylex(&l);
+				return err;
+			}
 		}
 		else if (isdigit(data[i]))
 		{
-			ls_lexnum(&l, name, data, len, &i);
+			ls_err_t err = ls_lexnum(&l, name, data, len, &i);
+			if (err.code)
+			{
+				ls_destroylex(&l);
+				return err;
+			}
 		}
 		else if (!strncmp(&data[i], "//", 2))
 		{
@@ -309,18 +319,40 @@ ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 }
 
 static void
-ls_lexword(
-	ls_lex_t *l,
-	char const *name,
-	char const *data,
-	uint32_t len,
-	size_t *i
-)
+ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
 {
-	// TODO: implement.
+	size_t begin = *i;
+	
+	size_t end = begin;
+	while (end < len && (isalnum(data[end]) || data[end] == '_'))
+	{
+		++end;
+	}
+	
+	for (size_t kw = LS_KWBOOL; kw <= LS_KWWHILE; ++kw)
+	{
+		size_t kwlen = strlen(ls_toknames[kw]);
+		
+		if (kwlen != end - begin)
+		{
+			continue;
+		}
+		
+		if (strncmp(&data[begin], ls_toknames[kw], kwlen))
+		{
+			continue;
+		}
+		
+		ls_addtok(l, kw, begin, kwlen);
+		*i = end - 1;
+		return;
+	}
+	
+	ls_addtok(l, LS_IDENT, begin, end - begin);
+	*i = end - 1;
 }
 
-static void
+static ls_err_t
 ls_lexstr(
 	ls_lex_t *l,
 	char const *name,
@@ -329,10 +361,50 @@ ls_lexstr(
 	size_t *i
 )
 {
-	// TODO: implement.
+	size_t begin = *i;
+	
+	size_t end = begin + 1;
+	while (end < len && data[end] != '"')
+	{
+		if (data[end] == '\\')
+		{
+			if (end + 1 >= len)
+			{
+				return (ls_err_t)
+				{
+					.code = 1,
+					.pos = end + 1,
+					.len = 1,
+					.src = ls_strdup(name),
+					.msg = ls_strdup("expected an escape sequence")
+				};
+			}
+			
+			++end;
+		}
+		
+		++end;
+	}
+	--begin;
+	
+	if (end >= len)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.pos = begin,
+			.len = end - begin,
+			.src = ls_strdup(name),
+			.msg = ls_strdup("unterminated string")
+		};
+	}
+	
+	ls_addtok(l, LS_LITSTR, begin, end - begin + 1);
+	*i = end;
+	return (ls_err_t){0};
 }
 
-static void
+static ls_err_t
 ls_lexnum(
 	ls_lex_t *l,
 	char const *name,
@@ -341,7 +413,38 @@ ls_lexnum(
 	size_t *i
 )
 {
-	// TODO: implement.
+	size_t begin = *i;
+	
+	uint32_t ndp = 0;
+	size_t end = begin;
+	while (end < len && (isdigit(data[end]) || data[end] == '.'))
+	{
+		ndp += data[end] == '.';
+		++end;
+	}
+	
+	if (!ndp)
+	{
+		ls_addtok(l, LS_LITINT, begin, end - begin);
+		*i = end - 1;
+		return (ls_err_t){0};
+	}
+	
+	if (ndp > 1)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.pos = begin,
+			.len = end - begin,
+			.src = ls_strdup(name),
+			.msg = ls_strdup("real literal contains more than one decimal point")
+		};
+	}
+	
+	ls_addtok(l, LS_LITREAL, begin, end - begin);
+	*i = end - 1;
+	return (ls_err_t){0};
 }
 
 static void
