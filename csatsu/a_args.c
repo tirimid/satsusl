@@ -13,7 +13,7 @@ a_proc(i32 argc, char *argv[])
 		switch (ch)
 		{
 		case 'h':
-			a_usage(name);
+			a_usage(argv[0]);
 			exit(0);
 		case 't':
 			if (!strcmp(optarg, "exec"))
@@ -30,9 +30,7 @@ a_proc(i32 argc, char *argv[])
 			}
 			else
 			{
-				// TODO: maybe rewrite this error.
-				fprintf(stderr, "you really done fucked up big time buddy\n");
-				exit(1);
+				err("args: unknown argument for -t - %s!", optarg);
 			}
 			break;
 		default:
@@ -42,12 +40,15 @@ a_proc(i32 argc, char *argv[])
 	
 	if (optind + 1 != argc)
 	{
-		// TODO: rewrite error.
-		fprintf(stderr, "fuck you\n");
-		exit(1);
+		err("args: missing required positional argument!");
 	}
 	
-	// TODO: get args for required arg.
+	a_args.infile = argv[optind];
+	a_args.infp = openread(argv[optind]);
+	if (!a_args.infp)
+	{
+		err("args: file cannot be read - %s!", argv[optind]);
+	}
 }
 
 static void

@@ -82,6 +82,55 @@ typedef enum ls_toktype
 
 typedef enum ls_nodetype
 {
+	LS_NULL = 0,
+	
+	// structure nodes.
+	LS_ROOT,
+	LS_IMPORT,
+	LS_FUNC,
+	LS_DECLARATION,
+	LS_ARGLIST,
+	LS_ARG,
+	LS_RETURN,
+	LS_CTREE,
+	LS_WHILE,
+	LS_FOR,
+	LS_BREAK,
+	LS_CONTINUE,
+	LS_BLOCK,
+	
+	// type nodes.
+	LS_TYPE,
+	
+	// expression nodes.
+	LS_EATOM,
+	LS_ECALL,
+	LS_EACCESS,
+	LS_ENEG,
+	LS_ENOT,
+	LS_EENV,
+	LS_EMUL,
+	LS_EDIV,
+	LS_EMOD,
+	LS_EADD,
+	LS_ESUB,
+	LS_ELESS,
+	LS_ELEQUAL,
+	LS_EGREATER,
+	LS_EGREQUAL,
+	LS_EEQUAL,
+	LS_ENEQUAL,
+	LS_EAND,
+	LS_EOR,
+	LS_EXOR,
+	LS_ETERNARY,
+	LS_EASSIGN,
+	LS_EADDASSIGN,
+	LS_ESUBASSIGN,
+	LS_EMULASSIGN,
+	LS_EDIVASSIGN,
+	LS_EMODASSIGN,
+	
 	LS_NODETYPE_END
 } ls_nodetype_t;
 
@@ -146,14 +195,19 @@ extern char const *ls_nodenames[LS_NODETYPE_END];
 // util.
 void ls_destroyerr(ls_err_t *err);
 void ls_destroylex(ls_lex_t *l);
+ls_err_t ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen);
 
 // lex.
-ls_err_t ls_lexfile(ls_lex_t *out, FILE *fp, char const *name);
 ls_err_t ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len);
 void ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len);
+void ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type);
 
 // parse.
 ls_err_t ls_parse(ls_ast_t *out, ls_lex_t const *l);
+uint32_t ls_addnode(ls_ast_t *a, ls_nodetype_t type);
+void ls_parentnode(ls_ast_t *a, uint32_t parent, uint32_t child);
+void ls_printast(FILE *fp, ls_ast_t const *ast);
+void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_node_t const *n, uint32_t depth);
 
 #ifdef __cplusplus
 }

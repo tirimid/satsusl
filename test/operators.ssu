@@ -28,8 +28,12 @@
 //
 // left-to-right
 // &&      logical AND
-// ||      logical OR
+//
+// left-to-right
 // ^^      logical XOR
+//
+// left-to-right
+// ||      logical OR
 //
 // right-to-left
 // ?:      tenary conditional

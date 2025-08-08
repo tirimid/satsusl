@@ -67,47 +67,6 @@ static ls_err_t ls_lexnum(ls_lex_t *l, char const *name, char const *data, uint3
 static void ls_lexcomment(char const *data, uint32_t len, size_t *i);
 
 ls_err_t
-ls_lexfile(ls_lex_t *out, FILE *fp, char const *name)
-{
-	fseek(fp, 0, SEEK_END);
-	ssize_t len = ftell(fp);
-	if (len < 0)
-	{
-		return (ls_err_t)
-		{
-			.code = 1,
-			.src = ls_strdup(name),
-			.msg = ls_strdup("failed to get file size")
-		};
-	}
-	
-	if (len >= UINT32_MAX)
-	{
-		return (ls_err_t)
-		{
-			.code = 1,
-			.src = ls_strdup(name),
-			.msg = ls_strdup("file is too big to lex")
-		};
-	}
-	
-	char *conts = ls_calloc(len, 1);
-	fseek(fp, 0, SEEK_SET);
-	if (fread(conts, 1, len, fp) != (size_t)len)
-	{
-		ls_free(conts);
-		return (ls_err_t)
-		{
-			.code = 1,
-			.src = ls_strdup(name),
-			.msg = ls_strdup("failed to read file")
-		};
-	}
-	
-	return ls_lex(out, name, conts, len);
-}
-
-ls_err_t
 ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 {
 	ls_lex_t l =
@@ -316,6 +275,12 @@ ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 	};
 	l->types[l->ntoks] = type;
 	++l->ntoks;
+}
+
+void
+ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type)
+{
+	fprintf(fp, "%-14s%-8u%u\n", ls_toknames[type], tok.pos, tok.len);
 }
 
 static void

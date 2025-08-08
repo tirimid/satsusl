@@ -16,3 +16,8 @@ typedef size_t usize;
 
 typedef float f32;
 typedef double f64;
+
+void err(char const *fmt, ...);
+void errfile(char const *name, char const *data, usize pos, usize len, char const *fmt, ...);
+void showfile(FILE *fp, char const *name, char const *data, usize pos, usize len);
+FILE *openread(char const *file);
