@@ -13,19 +13,6 @@ ls_destroyerr(ls_err_t *err)
 	}
 }
 
-void
-ls_destroylex(ls_lex_t *l)
-{
-	if (l->toks)
-	{
-		ls_free(l->toks);
-	}
-	if (l->types)
-	{
-		ls_free(l->types);
-	}
-}
-
 ls_err_t
 ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen)
 {

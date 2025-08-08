@@ -2,6 +2,8 @@
 
 char const *ls_toknames[LS_TOKTYPE_END] =
 {
+	"null",
+	
 	"identifier",
 	
 	// literals.
@@ -25,6 +27,7 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	"string",
 	"true",
 	"var",
+	"void",
 	"while",
 	
 	// punctuation.
@@ -75,6 +78,7 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		.types = ls_calloc(1, 1),
 		.tokcap = 1
 	};
+	ls_addtok(&l, LS_NULL, 0, 0);
 	
 	for (size_t i = 0; i < len; ++i)
 	{
@@ -280,7 +284,20 @@ ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 void
 ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type)
 {
-	fprintf(fp, "%-14s%-8u%u\n", ls_toknames[type], tok.pos, tok.len);
+	fprintf(fp, "%-14s%u+%u\n", ls_toknames[type], tok.pos, tok.len);
+}
+
+void
+ls_destroylex(ls_lex_t *l)
+{
+	if (l->toks)
+	{
+		ls_free(l->toks);
+	}
+	if (l->types)
+	{
+		ls_free(l->types);
+	}
 }
 
 static void

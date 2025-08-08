@@ -13,13 +13,15 @@ extern "C"
 #include <stdint.h>
 #include <stdlib.h>
 
+#define LS_NULL 0
+
 //--------------------//
 // enumeration values //
 //--------------------//
 
 typedef enum ls_toktype
 {
-	LS_IDENT = 0,
+	LS_IDENT = 1,
 	
 	// literals.
 	LS_LITINT,
@@ -42,6 +44,7 @@ typedef enum ls_toktype
 	LS_KWSTRING,
 	LS_KWTRUE,
 	LS_KWVAR,
+	LS_KWVOID,
 	LS_KWWHILE,
 	
 	// punctuation.
@@ -82,10 +85,8 @@ typedef enum ls_toktype
 
 typedef enum ls_nodetype
 {
-	LS_NULL = 0,
-	
 	// structure nodes.
-	LS_ROOT,
+	LS_ROOT = 1,
 	LS_IMPORT,
 	LS_FUNC,
 	LS_DECLARATION,
@@ -194,20 +195,21 @@ extern char const *ls_nodenames[LS_NODETYPE_END];
 
 // util.
 void ls_destroyerr(ls_err_t *err);
-void ls_destroylex(ls_lex_t *l);
 ls_err_t ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen);
 
 // lex.
 ls_err_t ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len);
 void ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len);
 void ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type);
+void ls_destroylex(ls_lex_t *l);
 
 // parse.
-ls_err_t ls_parse(ls_ast_t *out, ls_lex_t const *l);
+ls_err_t ls_parse(ls_ast_t *out, ls_lex_t const *l, char const *name);
 uint32_t ls_addnode(ls_ast_t *a, ls_nodetype_t type);
 void ls_parentnode(ls_ast_t *a, uint32_t parent, uint32_t child);
-void ls_printast(FILE *fp, ls_ast_t const *ast);
-void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_node_t const *n, uint32_t depth);
+void ls_printast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
+void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
+void ls_destroyast(ls_ast_t *a);
 
 #ifdef __cplusplus
 }

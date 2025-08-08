@@ -48,5 +48,18 @@ main(int argc, char *argv[])
 		return 0;
 	}
 	
+	ls_ast_t ast;
+	e = ls_parse(&ast, &lex, a_args.infile);
+	if (e.code)
+	{
+		errfile(e.src, filedata, e.pos, e.len, "main: parse failed - %s!", e.msg);
+	}
+	
+	if (a_args.target == A_PARSE)
+	{
+		ls_printast(stdout, &ast, &lex);
+		return 0;
+	}
+	
 	return 0;
 }
