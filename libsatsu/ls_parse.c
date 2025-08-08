@@ -163,6 +163,7 @@ ls_parse(ls_ast_t *out, ls_lex_t const *l, char const *name)
 		return e;
 	}
 	
+	*out = a;
 	return (ls_err_t){0};
 }
 
@@ -224,7 +225,7 @@ ls_printnode(
 	ls_tok_t tok = lex->toks[node.tok];
 	fprintf(
 		fp,
-		"%s | %s %u+%u\n",
+		"%-12s %-14s %u+%u\n",
 		ls_nodenames[ast->types[n]],
 		ls_toknames[lex->types[node.tok]],
 		tok.pos,
@@ -297,12 +298,11 @@ ls_expecttok(ls_pstate_t *p, ls_toktype_t type)
 		};
 	}
 	
-	ls_toktype_t actual = p->lex->types[p->cur];
-	ls_tok_t tok = p->lex->toks[p->cur];
-	if (actual != type)
+	if (p->lex->types[p->cur] != type)
 	{
+		ls_tok_t tok = p->lex->toks[p->cur];
 		char msg[128];
-		sprintf(msg, "expected %s, found %s", ls_toknames[type], ls_toknames[actual]);
+		sprintf(msg, "expected %s", ls_toknames[type]);
 		return (ls_err_t)
 		{
 			.code = 1,
@@ -428,6 +428,44 @@ ls_parsefunc(ls_pstate_t *p, uint32_t *out)
 static ls_err_t
 ls_parsedeclaration(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t decl = ls_addnode(p->ast, LS_DECLARATION);
+	
+	uint32_t type;
+	ls_err_t e = ls_parsetype(p, &type);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_parentnode(p->ast, decl, type);
+	
+	e = ls_expecttok(p, LS_IDENT);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	p->ast->nodes[decl].tok = p->cur;
+	
+	e = ls_expecttok(p, LS_EQUAL);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	uint8_t const term[] = {LS_SEMICOLON};
+	uint32_t val;
+	e = ls_parseexpr(p, &val, term, sizeof(term), 0);
+	if (e.code)
+	{
+		return e;
+	}
+	++p->cur;
+	
+	ls_parentnode(p->ast, decl, val);
+	
+	*out = decl;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
@@ -522,41 +560,304 @@ ls_parsearg(ls_pstate_t *p, uint32_t *out)
 static ls_err_t
 ls_parsereturn(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t return_ = ls_addnode(p->ast, LS_RETURN);
+	p->ast->nodes[return_].tok = p->cur;
+	
+	if (ls_nexttok(p) == LS_SEMICOLON)
+	{
+		*out = return_;
+		return (ls_err_t){0};
+	}
+	--p->cur;
+	
+	uint8_t const term[] = {LS_SEMICOLON};
+	uint32_t val;
+	ls_err_t e = ls_parseexpr(p, &val, term, sizeof(term), 0);
+	if (e.code)
+	{
+		return e;
+	}
+	++p->cur;
+	
+	ls_parentnode(p->ast, return_, val);
+	
+	*out = return_;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_parsectree(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t ctree = ls_addnode(p->ast, LS_CTREE);
+	p->ast->nodes[ctree].tok = p->cur;
+	
+	ls_err_t e = ls_expecttok(p, LS_LPAREN);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	uint8_t const term[] = {LS_RPAREN};
+	uint32_t cond;
+	e = ls_parseexpr(p, &cond, term, sizeof(term), 0);
+	if (e.code)
+	{
+		return e;
+	}
+	++p->cur;
+	
+	ls_parentnode(p->ast, ctree, cond);
+	
+	uint32_t bodytrue;
+	e = ls_parsestmt(p, &bodytrue);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_parentnode(p->ast, ctree, bodytrue);
+	
+	if (ls_nexttok(p) != LS_KWELSE)
+	{
+		--p->cur;
+		*out = ctree;
+		return (ls_err_t){0};
+	}
+	
+	uint32_t bodyfalse;
+	e = ls_parsestmt(p, &bodyfalse);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_parentnode(p->ast, ctree, bodyfalse);
+	
+	*out = ctree;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_parsewhile(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t while_ = ls_addnode(p->ast, LS_WHILE);
+	p->ast->nodes[while_].tok = p->cur;
+	
+	ls_err_t e = ls_expecttok(p, LS_LPAREN);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	uint8_t const term[] = {LS_RPAREN};
+	uint32_t cond;
+	e = ls_parseexpr(p, &cond, term, sizeof(term), 0);
+	if (e.code)
+	{
+		return e;
+	}
+	++p->cur;
+	
+	ls_parentnode(p->ast, while_, cond);
+	
+	uint32_t body;
+	e = ls_parsestmt(p, &body);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_parentnode(p->ast, while_, body);
+	
+	*out = while_;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_parsefor(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t for_ = ls_addnode(p->ast, LS_FOR);
+	p->ast->nodes[for_].tok = p->cur;
+	
+	ls_err_t e = ls_expecttok(p, LS_LPAREN);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	if (ls_nexttok(p) == LS_KWVAR)
+	{
+		uint32_t init;
+		e = ls_parsedeclaration(p, &init);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_parentnode(p->ast, for_, init);
+	}
+	else
+	{
+		--p->cur;
+		uint8_t const initterm[] = {LS_SEMICOLON};
+		uint32_t init;
+		e = ls_parseexpr(p, &init, initterm, sizeof(initterm), 0);
+		if (e.code)
+		{
+			return e;
+		}
+		++p->cur;
+		ls_parentnode(p->ast, for_, init);
+	}
+	
+	uint8_t const condterm[] = {LS_SEMICOLON};
+	uint32_t cond;
+	e = ls_parseexpr(p, &cond, condterm, sizeof(condterm), 0);
+	if (e.code)
+	{
+		return e;
+	}
+	++p->cur;
+	
+	ls_parentnode(p->ast, for_, cond);
+	
+	uint8_t const incterm[] = {LS_RPAREN};
+	uint32_t inc;
+	e = ls_parseexpr(p, &inc, incterm, sizeof(incterm), 0);
+	if (e.code)
+	{
+		return e;
+	}
+	++p->cur;
+	
+	uint32_t body;
+	e = ls_parsestmt(p, &body);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_parentnode(p->ast, for_, body);
+	
+	*out = for_;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_parsebreak(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t break_ = ls_addnode(p->ast, LS_BREAK);
+	p->ast->nodes[break_].tok = p->cur;
+	
+	ls_err_t e = ls_expecttok(p, LS_SEMICOLON);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	*out = break_;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_parsecontinue(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t continue_ = ls_addnode(p->ast, LS_CONTINUE);
+	p->ast->nodes[continue_].tok = p->cur;
+	
+	ls_err_t e = ls_expecttok(p, LS_SEMICOLON);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	*out = continue_;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_parseblock(ls_pstate_t *p, uint32_t *out)
 {
+	uint32_t block = ls_addnode(p->ast, LS_BLOCK);
+	p->ast->nodes[block].tok = p->cur;
+	
+	for (;;)
+	{
+		if (ls_nexttok(p) == LS_RBRACE)
+		{
+			*out = block;
+			return (ls_err_t){0};
+		}
+		--p->cur;
+		
+		uint32_t stmt;
+		ls_err_t e = ls_parsestmt(p, &stmt);
+		if (e.code)
+		{
+			return e;
+		}
+		
+		ls_parentnode(p->ast, block, stmt);
+	}
 }
 
 static ls_err_t
 ls_parsestmt(ls_pstate_t *p, uint32_t *out)
 {
+	ls_toktype_t type;
+	ls_err_t e = ls_requiretok(p, &type);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	uint32_t stmt;
+	if (type == LS_KWVAR)
+	{
+		e = ls_parsedeclaration(p, &stmt);
+	}
+	else if (type == LS_LBRACE)
+	{
+		e = ls_parseblock(p, &stmt);
+	}
+	else if (type == LS_KWIF)
+	{
+		e = ls_parsectree(p, &stmt);
+	}
+	else if (type == LS_KWWHILE)
+	{
+		e = ls_parsewhile(p, &stmt);
+	}
+	else if (type == LS_KWCONTINUE)
+	{
+		e = ls_parsecontinue(p, &stmt);
+	}
+	else if (type == LS_KWBREAK)
+	{
+		e = ls_parsebreak(p, &stmt);
+	}
+	else if (type == LS_KWFOR)
+	{
+		e = ls_parsefor(p, &stmt);
+	}
+	else if (type == LS_KWRETURN)
+	{
+		e = ls_parsereturn(p, &stmt);
+	}
+	else
+	{
+		--p->cur;
+		uint8_t const term[] = {LS_SEMICOLON};
+		e = ls_parseexpr(p, &stmt, term, sizeof(term), 0);
+		++p->cur;
+	}
+	
+	if (e.code)
+	{
+		return e;
+	}
+	
+	*out = stmt;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
@@ -568,6 +869,93 @@ ls_parseexpr(
 	uint8_t minbp
 )
 {
+	uint32_t lhs;
+	
+	ls_toktype_t type;
+	ls_err_t e = ls_requiretok(p, &type);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	switch (type)
+	{
+	case LS_IDENT:
+	case LS_LITSTR:
+	case LS_LITINT:
+	case LS_LITREAL:
+	case LS_KWTRUE:
+	case LS_KWFALSE:
+		lhs = ls_addnode(p->ast, LS_EATOM);
+		p->ast->nodes[lhs].tok = p->cur;
+		break;
+	case LS_LPAREN:
+	{
+		uint8_t const subterm[] = {LS_RPAREN};
+		e = ls_parseexpr(p, &lhs, subterm, sizeof(subterm), 0);
+		++p->cur;
+		break;
+	}
+	default:
+		if (!ls_pratt[p->lex->types[p->cur]].nudtype)
+		{
+			ls_tok_t tok = p->lex->toks[p->cur];
+			return (ls_err_t)
+			{
+				.code = 1,
+				.pos = tok.pos,
+				.len = tok.len,
+				.src = ls_strdup(p->name),
+				.msg = ls_strdup("expected null denotation")
+			};
+		}
+		e = ls_parseexprnud(p, &lhs, term, nterm);
+		if (e.code)
+		{
+			return e;
+		}
+		break;
+	}
+	
+	for (;;)
+	{
+		e = ls_requiretok(p, &type);
+		--p->cur;
+		
+		for (size_t i = 0; i < nterm; ++i)
+		{
+			if (type == term[i])
+			{
+				*out = lhs;
+				return (ls_err_t){0};
+			}
+		}
+		
+		if (!ls_pratt[type].ledtype)
+		{
+			ls_tok_t tok = p->lex->toks[p->cur];
+			return (ls_err_t)
+			{
+				.code = 1,
+				.pos = tok.pos,
+				.len = tok.len,
+				.src = ls_strdup(p->name),
+				.msg = ls_strdup("expected left denotation")
+			};
+		}
+		
+		if (ls_pratt[type].ledleft < minbp)
+		{
+			*out = lhs;
+			return (ls_err_t){0};
+		}
+		
+		e = ls_parseexprled(p, &lhs, lhs, term, nterm);
+		if (e.code)
+		{
+			return e;
+		}
+	}
 }
 
 static ls_err_t
@@ -578,6 +966,35 @@ ls_parseexprnud(
 	size_t nterm
 )
 {
+	ls_toktype_t ttype = p->lex->types[p->cur];
+	ls_nodetype_t ntype = ls_pratt[ttype].nudtype;
+	
+	uint32_t lhs = ls_addnode(p->ast, ntype);
+	p->ast->nodes[lhs].tok = p->cur;
+	
+	switch (ntype)
+	{
+	case LS_EENV:
+		// TODO: implement $ nud-parse.
+		break;
+	case LS_ENEG:
+	case LS_ENOT:
+	{
+		uint32_t rhs;
+		ls_err_t e = ls_parseexpr(p, &rhs, term, nterm, ls_pratt[ttype].nudright);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_parentnode(p->ast, lhs, rhs);
+		break;
+	}
+	default:
+		break;
+	}
+	
+	*out = lhs;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
@@ -589,6 +1006,63 @@ ls_parseexprled(
 	size_t nterm
 )
 {
+	ls_toktype_t ltype;
+	ls_err_t e = ls_requiretok(p, &ltype);
+	if (e.code)
+	{
+		return e;
+	}
+	ls_nodetype_t ntype = ls_pratt[ltype].ledtype;
+	
+	uint32_t newlhs = ls_addnode(p->ast, ntype);
+	p->ast->nodes[newlhs].tok = p->cur;
+	ls_parentnode(p->ast, newlhs, lhs);
+	
+	switch (ntype)
+	{
+	case LS_ECALL:
+		// TODO: implement function call parse.
+		break;
+	case LS_ETERNARY:
+		// TODO: implement ternary conditional parse.
+		break;
+	case LS_EACCESS:
+	case LS_EMUL:
+	case LS_EDIV:
+	case LS_EMOD:
+	case LS_EADD:
+	case LS_ESUB:
+	case LS_ELESS:
+	case LS_ELEQUAL:
+	case LS_EGREATER:
+	case LS_EGREQUAL:
+	case LS_EEQUAL:
+	case LS_ENEQUAL:
+	case LS_EAND:
+	case LS_EXOR:
+	case LS_EOR:
+	case LS_EASSIGN:
+	case LS_EADDASSIGN:
+	case LS_ESUBASSIGN:
+	case LS_EMULASSIGN:
+	case LS_EDIVASSIGN:
+	case LS_EMODASSIGN:
+	{
+		uint32_t rhs;
+		e = ls_parseexpr(p, &rhs, term, nterm, ls_pratt[ltype].ledright);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_parentnode(p->ast, newlhs, rhs);
+		break;
+	}
+	default:
+		break;
+	}
+	
+	*out = newlhs;
+	return (ls_err_t){0};
 }
 
 static ls_err_t

@@ -3,6 +3,6 @@ import console;
 func int
 start()
 {
-	console.println("hello world");
+	//console.println("hello world");
 	return 0;
 }

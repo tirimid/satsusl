@@ -25,7 +25,7 @@ main(int argc, char *argv[])
 	a_proc(argc, argv);
 	
 	char *filedata;
-	size_t filelen;
+	usize filelen;
 	ls_err_t e = ls_readfile(a_args.infp, a_args.infile, &filedata, &filelen);
 	if (e.code)
 	{
@@ -36,7 +36,7 @@ main(int argc, char *argv[])
 	e = ls_lex(&lex, a_args.infile, filedata, filelen);
 	if (e.code)
 	{
-		errfile(e.src, filedata, e.pos, e.len, "main: lex failed - %s!", e.msg);
+		errfile(e.src, filedata, filelen, e.pos, e.len, "main: lex failed - %s!", e.msg);
 	}
 	
 	if (a_args.target == A_LEX)
@@ -52,7 +52,7 @@ main(int argc, char *argv[])
 	e = ls_parse(&ast, &lex, a_args.infile);
 	if (e.code)
 	{
-		errfile(e.src, filedata, e.pos, e.len, "main: parse failed - %s!", e.msg);
+		errfile(e.src, filedata, filelen, e.pos, e.len, "main: parse failed - %s!", e.msg);
 	}
 	
 	if (a_args.target == A_PARSE)

@@ -19,6 +19,7 @@ void
 errfile(
 	char const *name,
 	char const *data,
+	usize datalen,
 	usize pos,
 	usize len,
 	char const *fmt,
@@ -34,13 +35,20 @@ errfile(
 	
 	va_end(args);
 	
-	showfile(stderr, name, data, pos, len);
+	showfile(stderr, name, data, datalen, pos, len);
 	
 	exit(1);
 }
 
 void
-showfile(FILE *fp, char const *name, char const *data, usize pos, usize len)
+showfile(
+	FILE *fp,
+	char const *name,
+	char const *data,
+	usize datalen,
+	usize pos,
+	usize len
+)
 {
 	u32 line = 1;
 	for (usize i = 0; i < pos; ++i)
@@ -55,7 +63,7 @@ showfile(FILE *fp, char const *name, char const *data, usize pos, usize len)
 	}
 	
 	usize lend = pos;
-	while (lend < len && data[lend] != '\n')
+	while (lend < datalen && data[lend] != '\n')
 	{
 		++lend;
 	}
@@ -70,9 +78,11 @@ showfile(FILE *fp, char const *name, char const *data, usize pos, usize len)
 		if (data[i] == '\t')
 		{
 			fprintf(fp, "  ");
-			continue;
 		}
-		fprintf(fp, "%c", data[i]);
+		else
+		{
+			fprintf(fp, "%c", data[i]);
+		}
 	}
 	
 	fprintf(fp, "\n ");
