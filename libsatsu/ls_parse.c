@@ -43,7 +43,6 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	"eaccess",
 	"eneg",
 	"enot",
-	"eenv",
 	"emul",
 	"ediv",
 	"emod",
@@ -97,7 +96,6 @@ static ls_pratt_t ls_pratt[LS_TOKTYPE_END] =
 	
 	// right-to-left.
 	[LS_BANG] = {18, 17, 0, 0, LS_ENOT, LS_NULL},
-	[LS_DOLLAR] = {18, 17, 0, 0, LS_ENOT, LS_NULL},
 	
 	// left-to-right.
 	[LS_STAR] = {0, 0, 15, 16, LS_NULL, LS_EMUL},
@@ -974,9 +972,6 @@ ls_parseexprnud(
 	
 	switch (ntype)
 	{
-	case LS_EENV:
-		// TODO: implement $ nud-parse.
-		break;
 	case LS_ENEG:
 	case LS_ENOT:
 	{
@@ -1021,11 +1016,54 @@ ls_parseexprled(
 	switch (ntype)
 	{
 	case LS_ECALL:
-		// TODO: implement function call parse.
+		if (ls_nexttok(p) == LS_RPAREN)
+		{
+			break;
+		}
+		--p->cur;
+		
+		for (;;)
+		{
+			uint8_t const argterm[] = {LS_COMMA, LS_RPAREN};
+			uint32_t arg;
+			e = ls_parseexpr(p, &arg, argterm, sizeof(argterm), 0);
+			if (e.code)
+			{
+				return e;
+			}
+			
+			ls_parentnode(p->ast, newlhs, arg);
+			
+			ls_toktype_t endtype = ls_nexttok(p);
+			if (endtype == LS_RPAREN)
+			{
+				break;
+			}
+		}
+		
 		break;
 	case LS_ETERNARY:
-		// TODO: implement ternary conditional parse.
+	{
+		uint8_t const mhsterm[] = {LS_COLON};
+		uint32_t mhs;
+		e = ls_parseexpr(p, &mhs, mhsterm, sizeof(mhsterm), 0);
+		if (e.code)
+		{
+			return e;
+		}
+		++p->cur;
+		ls_parentnode(p->ast, newlhs, mhs);
+		
+		uint32_t rhs;
+		e = ls_parseexpr(p, &rhs, term, nterm, ls_pratt[ltype].ledright);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_parentnode(p->ast, newlhs, rhs);
+		
 		break;
+	}
 	case LS_EACCESS:
 	case LS_EMUL:
 	case LS_EDIV:

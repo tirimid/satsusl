@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
+// global util macros.
+#define LS_STRINGIFY(s) #s
+
 // standard library.
 #include <ctype.h>
 #include <string.h>
 
 // system dependencies.
+#include <sys/stat.h>
 #include <unistd.h>
 
 // project headers.

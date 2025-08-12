@@ -3,17 +3,14 @@
 #ifndef LS_SATSU_H
 #define LS_SATSU_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #define LS_NULL 0
+#define LS_MAXIDENT 63
 
 //--------------------//
 // enumeration values //
@@ -57,7 +54,6 @@ typedef enum ls_toktype
 	LS_PERIOD,
 	LS_MINUS,
 	LS_BANG,
-	LS_DOLLAR,
 	LS_STAR,
 	LS_SLASH,
 	LS_PERCENT,
@@ -109,7 +105,6 @@ typedef enum ls_nodetype
 	LS_EACCESS,
 	LS_ENEG,
 	LS_ENOT,
-	LS_EENV,
 	LS_EMUL,
 	LS_EDIV,
 	LS_EMOD,
@@ -135,6 +130,17 @@ typedef enum ls_nodetype
 	LS_NODETYPE_END
 } ls_nodetype_t;
 
+typedef enum ls_primtype
+{
+	LS_INT = 1,
+	LS_REAL,
+	LS_STRING,
+	LS_BOOL,
+	LS_VOID,
+	
+	LS_PRIMTYPE_END
+} ls_primtype_t;
+
 //-----------------//
 // data structures //
 //-----------------//
@@ -143,7 +149,7 @@ typedef struct ls_err
 {
 	int32_t code;
 	uint32_t pos, len;
-	char *src;
+	size_t src_;
 	char *msg;
 } ls_err_t;
 
@@ -173,6 +179,17 @@ typedef struct ls_ast
 	size_t nnodes, nodecap;
 } ls_ast_t;
 
+typedef struct ls_module
+{
+	char **names;
+	uint64_t *ids;
+	char **data;
+	uint32_t **lens;
+	ls_lex_t *lexes;
+	ls_ast_t *asts;
+	size_t nmods, modcap;
+} ls_module_t;
+
 //-----------------------//
 // library configuration //
 //-----------------------//
@@ -188,6 +205,7 @@ extern char *(*ls_strdup)(char const *);
 
 extern char const *ls_toknames[LS_TOKTYPE_END];
 extern char const *ls_nodenames[LS_NODETYPE_END];
+extern char const *ls_primtypenames[LS_PRIMTYPE_END];
 
 //------------//
 // procedures //
@@ -196,10 +214,13 @@ extern char const *ls_nodenames[LS_NODETYPE_END];
 // util.
 void ls_destroyerr(ls_err_t *err);
 ls_err_t ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen);
+uint64_t ls_fileid(char const *file, bool deref);
 
 // lex.
 ls_err_t ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len);
 void ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len);
+void ls_readtokraw(char out[], char const *data, ls_tok_t const *t);
+void ls_readtokstr(char out[], char const *data, ls_tok_t const *t);
 void ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type);
 void ls_destroylex(ls_lex_t *l);
 
@@ -211,8 +232,10 @@ void ls_printast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
 void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
 void ls_destroyast(ls_ast_t *a);
 
-#ifdef __cplusplus
-}
-#endif
+// sema.
+ls_err_t ls_buildmodule(ls_module_t *out, ls_ast_t *a, ls_lex_t *l, char const *name, uint64_t id, char *data, uint32_t len, char const *paths[], size_t npaths);
+void ls_pushmodule(ls_module_t *m, ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
+void ls_printmodule(FILE *fp, ls_module_t const *m);
+void ls_destroymodule(ls_module_t *m);
 
 #endif

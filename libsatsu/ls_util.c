@@ -23,7 +23,6 @@ ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen)
 		return (ls_err_t)
 		{
 			.code = 1,
-			.src = ls_strdup(name),
 			.msg = ls_strdup("failed to get file size")
 		};
 	}
@@ -33,7 +32,6 @@ ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen)
 		return (ls_err_t)
 		{
 			.code = 1,
-			.src = ls_strdup(name),
 			.msg = ls_strdup("file is too big to lex")
 		};
 	}
@@ -46,7 +44,6 @@ ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen)
 		return (ls_err_t)
 		{
 			.code = 1,
-			.src = ls_strdup(name),
 			.msg = ls_strdup("failed to read file")
 		};
 	}
@@ -54,4 +51,22 @@ ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen)
 	*outdata = data;
 	*outlen = len;
 	return (ls_err_t){0};
+}
+
+uint64_t
+ls_fileid(char const *file, bool deref)
+{
+	int (*statfn[])(char const *restrict, struct stat *restrict) =
+	{
+		lstat,
+		stat
+	};
+	
+	struct stat stat;
+	if (statfn[deref](file, &stat))
+	{
+		return 0;
+	}
+	
+	return stat.st_ino;
 }

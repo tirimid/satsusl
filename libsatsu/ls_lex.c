@@ -40,7 +40,6 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	".",
 	"-",
 	"!",
-	"$",
 	"*",
 	"/",
 	"%",
@@ -64,7 +63,7 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	"%="
 };
 
-static void ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i);
+static ls_err_t ls_lexword(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
 static ls_err_t ls_lexstr(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
 static ls_err_t ls_lexnum(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
 static void ls_lexcomment(char const *data, uint32_t len, size_t *i);
@@ -88,7 +87,12 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		}
 		else if (isalpha(data[i]) || data[i] == '_')
 		{
-			ls_lexword(&l, data, len, &i);
+			ls_err_t err = ls_lexword(&l, name, data, len, &i);
+			if (err.code)
+			{
+				ls_destroylex(&l);
+				return err;
+			}
 		}
 		else if (data[i] == '"')
 		{
@@ -141,10 +145,6 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		else if (data[i] == '!')
 		{
 			ls_addtok(&l, LS_BANG, i, 1);
-		}
-		else if (data[i] == '$')
-		{
-			ls_addtok(&l, LS_DOLLAR, i, 1);
 		}
 		else if (!strncmp(&data[i], "*=", 2))
 		{
@@ -244,6 +244,10 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		{
 			ls_addtok(&l, LS_RBRACE, i, 1);
 		}
+		else if (data[i] == ',')
+		{
+			ls_addtok(&l, LS_COMMA, i, 1);
+		}
 		else
 		{
 			ls_destroylex(&l);
@@ -252,7 +256,6 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 				.code = 1,
 				.pos = i,
 				.len = 1,
-				.src = ls_strdup(name),
 				.msg = ls_strdup("unrecognized character")
 			};
 		}
@@ -282,6 +285,18 @@ ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 }
 
 void
+ls_readtokraw(char out[], char const *data, ls_tok_t const *t)
+{
+	memcpy(out, &data[t->pos], t->len);
+}
+
+void
+ls_readtokstr(char out[], char const *data, ls_tok_t const *t)
+{
+	// TODO: implement ls_readtokstr().
+}
+
+void
 ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type)
 {
 	fprintf(fp, "%-14s%u+%u\n", ls_toknames[type], tok.pos, tok.len);
@@ -300,8 +315,8 @@ ls_destroylex(ls_lex_t *l)
 	}
 }
 
-static void
-ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
+static ls_err_t
+ls_lexword(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i)
 {
 	size_t begin = *i;
 	
@@ -327,11 +342,23 @@ ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
 		
 		ls_addtok(l, kw, begin, kwlen);
 		*i = end - 1;
-		return;
+		return (ls_err_t){0};
+	}
+	
+	if (end - begin > LS_MAXIDENT)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.pos = begin,
+			.len = end - begin,
+			.msg = ls_strdup("identifier exceeds " LS_STRINGIFY(LS_MAXIDENT) " characters")
+		};
 	}
 	
 	ls_addtok(l, LS_IDENT, begin, end - begin);
 	*i = end - 1;
+	return (ls_err_t){0};
 }
 
 static ls_err_t
@@ -357,7 +384,6 @@ ls_lexstr(
 					.code = 1,
 					.pos = end + 1,
 					.len = 1,
-					.src = ls_strdup(name),
 					.msg = ls_strdup("expected an escape sequence")
 				};
 			}
@@ -376,7 +402,6 @@ ls_lexstr(
 			.code = 1,
 			.pos = begin,
 			.len = end - begin,
-			.src = ls_strdup(name),
 			.msg = ls_strdup("unterminated string")
 		};
 	}
@@ -419,7 +444,6 @@ ls_lexnum(
 			.code = 1,
 			.pos = begin,
 			.len = end - begin,
-			.src = ls_strdup(name),
 			.msg = ls_strdup("real literal contains more than one decimal point")
 		};
 	}
