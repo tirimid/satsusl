@@ -88,8 +88,8 @@ typedef enum ls_nodetype
 	// structure nodes.
 	LS_ROOT = 1,
 	LS_IMPORT,
-	LS_FUNC,
-	LS_DECLARATION,
+	LS_FUNCDECL,
+	LS_DECL,
 	LS_ARGLIST,
 	LS_ARG,
 	LS_RETURN,
@@ -141,6 +141,7 @@ typedef enum ls_primtype
 	LS_STRING,
 	LS_BOOL,
 	LS_VOID,
+	LS_FUNC,
 	
 	LS_PRIMTYPE_END
 } ls_primtype_t;
@@ -151,9 +152,9 @@ typedef enum ls_primtype
 
 typedef struct ls_err
 {
-	int32_t code;
+	int16_t code;
+	uint16_t src;
 	uint32_t pos, len;
-	size_t src;
 	char *msg;
 } ls_err_t;
 
@@ -166,7 +167,7 @@ typedef struct ls_lex
 {
 	ls_tok_t *toks;
 	uint8_t *types;
-	size_t ntoks, tokcap;
+	uint32_t ntoks, tokcap;
 } ls_lex_t;
 
 typedef struct ls_node
@@ -179,8 +180,9 @@ typedef struct ls_node
 typedef struct ls_ast
 {
 	ls_node_t *nodes;
-	uint8_t *types;
-	size_t nnodes, nodecap;
+	uint8_t *types; // ls_nodetype_t (parse).
+	uint8_t *typeinfo; // ls_primtype_t (sema).
+	uint32_t nnodes, nodecap;
 } ls_ast_t;
 
 typedef struct ls_module
@@ -191,8 +193,17 @@ typedef struct ls_module
 	uint32_t *lens;
 	ls_lex_t *lexes;
 	ls_ast_t *asts;
-	size_t nmods, modcap;
+	uint32_t nmods, modcap;
 } ls_module_t;
+
+typedef struct ls_symtab
+{
+	char **syms;
+	uint8_t *types;
+	uint32_t *mods, *nodes;
+	uint16_t *scopes;
+	uint32_t nsyms, symcap;
+} ls_symtab_t;
 
 //-----------------------//
 // library configuration //
@@ -234,6 +245,8 @@ uint32_t ls_addnode(ls_ast_t *a, ls_nodetype_t type);
 void ls_parentnode(ls_ast_t *a, uint32_t parent, uint32_t child);
 void ls_printast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
 void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
+void ls_printtypedast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
+void ls_printtypednode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
 void ls_destroyast(ls_ast_t *a);
 
 // sema.
@@ -242,5 +255,11 @@ ls_err_t ls_resolveimports(ls_module_t *m, char const *paths[], size_t npaths);
 void ls_pushmodule(ls_module_t *m, ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
 void ls_printmoduleasts(FILE *fp, ls_module_t const *m);
 void ls_destroymodule(ls_module_t *m);
+ls_err_t ls_gentypeinfo(ls_module_t *m);
+void ls_printmoduletypedasts(FILE *fp, ls_module_t const *m);
+ls_symtab_t ls_createsymtab(void);
+int64_t ls_findsym(ls_symtab_t const *st, char const *sym);
+void ls_pushsym(ls_symtab_t *st, char *sym, ls_primtype_t type, uint32_t mod, uint32_t node, uint16_t scope);
+void ls_destroysymtab(ls_symtab_t *st);
 
 #endif

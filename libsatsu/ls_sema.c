@@ -8,8 +8,11 @@ char const *ls_primtypenames[LS_PRIMTYPE_END] =
 	"real",
 	"string",
 	"bool",
-	"void"
+	"void",
+	"func"
 };
+
+static ls_err_t ls_typefunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st);
 
 // *out takes ownership of *a, *l, name[0:strlen(name)], and data[0:len].
 ls_module_t
@@ -245,4 +248,134 @@ ls_destroymodule(ls_module_t *m)
 	{
 		free(m->asts);
 	}
+}
+
+ls_err_t
+ls_gentypeinfo(ls_module_t *m)
+{
+	// set initial null typeinfo and create global symtab.
+	ls_symtab_t st = ls_createsymtab();
+	for (size_t i = 0; i < m->nmods; ++i)
+	{
+		memset(m->asts[i].typeinfo, 0, m->asts[i].nnodes);
+		for (size_t j = 0; j < m->asts[i].nnodes; ++j)
+		{
+			if (m->asts[i].types[j] != LS_FUNCDECL)
+			{
+				continue;
+			}
+			
+			ls_tok_t tok = m->lexes[i].toks[m->asts[i].nodes[j].tok];
+			
+			char sym[LS_MAXIDENT + 1];
+			ls_readtokraw(sym, m->data[i], tok);
+			
+			int64_t prev = ls_findsym(&st, sym);
+			if (prev != -1)
+			{
+				size_t prevmod = st.mods[prev], prevnode = st.nodes[prev];
+				ls_tok_t prevtok = m->lexes[prevmod].toks[m->asts[prevmod].nodes[prevnode].tok];
+				
+				char msg[256];
+				sprintf(msg, "previously defined at %u+%u in %s", prevtok.pos, prevtok.len, m->names[prevmod]);
+				
+				ls_destroysymtab(&st);
+				
+				return (ls_err_t)
+				{
+					.code = 1,
+					.src = i,
+					.pos = tok.pos,
+					.len = tok.len,
+					.msg = ls_strdup(msg)
+				};
+			}
+			
+			ls_pushsym(&st, ls_strdup(sym), LS_FUNC, i, j, 0);
+		}
+	}
+	
+	return (ls_err_t){0};
+}
+
+void
+ls_printmoduletypedasts(FILE *fp, ls_module_t const *m)
+{
+	// TODO: implement ls_printmoduletypedasts().
+}
+
+ls_symtab_t
+ls_createsymtab(void)
+{
+	return (ls_symtab_t)
+	{
+		.syms = ls_calloc(1, sizeof(char *)),
+		.types = ls_calloc(1, 1),
+		.mods = ls_calloc(1, sizeof(uint32_t)),
+		.nodes = ls_calloc(1, sizeof(uint32_t)),
+		.scopes = ls_calloc(1, sizeof(uint16_t)),
+		.symcap = 1
+	};
+}
+
+int64_t
+ls_findsym(ls_symtab_t const *st, char const *sym)
+{
+	for (size_t i = 0; i < st->nsyms; ++i)
+	{
+		if (!strcmp(st->syms[i], sym))
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+void
+ls_pushsym(
+	ls_symtab_t *st,
+	char *sym,
+	ls_primtype_t type,
+	uint32_t mod,
+	uint32_t node,
+	uint16_t scope
+)
+{
+	// TODO: implement ls_pushsym().
+}
+
+void
+ls_destroysymtab(ls_symtab_t *st)
+{
+	for (size_t i = 0; i < st->nsyms; ++i)
+	{
+		ls_free(st->syms[i]);
+	}
+	
+	if (st->syms)
+	{
+		ls_free(st->syms);
+	}
+	if (st->types)
+	{
+		ls_free(st->types);
+	}
+	if (st->mods)
+	{
+		ls_free(st->mods);
+	}
+	if (st->nodes)
+	{
+		ls_free(st->nodes);
+	}
+	if (st->scopes)
+	{
+		ls_free(st->scopes);
+	}
+}
+
+static ls_err_t
+ls_typefunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
+{
+	// TODO: implement ls_typefunc().
 }

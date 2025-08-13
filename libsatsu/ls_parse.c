@@ -21,8 +21,8 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	// structure nodes.
 	"root",
 	"import",
-	"func",
-	"declaration",
+	"funcdecl",
+	"decl",
 	"arglist",
 	"arg",
 	"return",
@@ -141,6 +141,7 @@ ls_parse(ls_ast_t *out, ls_lex_t const *l)
 	{
 		.nodes = ls_calloc(1, sizeof(ls_node_t)),
 		.types = ls_calloc(1, 1),
+		.typeinfo = ls_calloc(1, 1),
 		.nodecap = 1
 	};
 	
@@ -171,6 +172,7 @@ ls_addnode(ls_ast_t *a, ls_nodetype_t type)
 		a->nodecap *= 2;
 		a->nodes = ls_reallocarray(a->nodes, a->nodecap, sizeof(ls_node_t));
 		a->types = ls_reallocarray(a->types, a->nodecap, 1);
+		a->typeinfo = ls_reallocarray(a->typeinfo, a->nodecap, 1);
 	}
 	
 	a->nodes[a->nnodes] = (ls_node_t)
@@ -235,6 +237,24 @@ ls_printnode(
 }
 
 void
+ls_printtypedast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex)
+{
+	// TODO: implement ls_printtypedast().
+}
+
+void
+ls_printtypednode(
+	FILE *fp,
+	ls_ast_t const *ast,
+	ls_lex_t const *lex,
+	uint32_t n,
+	uint32_t depth
+)
+{
+	// TODO: implement ls_printtypednode().
+}
+
+void
 ls_destroyast(ls_ast_t *a)
 {
 	for (size_t i = 0; i < a->nnodes; ++i)
@@ -244,6 +264,7 @@ ls_destroyast(ls_ast_t *a)
 	
 	ls_free(a->nodes);
 	ls_free(a->types);
+	ls_free(a->typeinfo);
 }
 
 static ls_toktype_t
@@ -379,7 +400,7 @@ ls_parseimport(ls_pstate_t *p, uint32_t *out)
 static ls_err_t
 ls_parsefunc(ls_pstate_t *p, uint32_t *out)
 {
-	uint32_t fn = ls_addnode(p->ast, LS_FUNC);
+	uint32_t fn = ls_addnode(p->ast, LS_FUNCDECL);
 	
 	uint32_t type;
 	ls_err_t e = ls_parsetype(p, &type);
@@ -420,7 +441,7 @@ ls_parsefunc(ls_pstate_t *p, uint32_t *out)
 static ls_err_t
 ls_parsedeclaration(ls_pstate_t *p, uint32_t *out)
 {
-	uint32_t decl = ls_addnode(p->ast, LS_DECLARATION);
+	uint32_t decl = ls_addnode(p->ast, LS_DECL);
 	
 	uint32_t type;
 	ls_err_t e = ls_parsetype(p, &type);
