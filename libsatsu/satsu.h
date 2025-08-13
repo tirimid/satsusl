@@ -180,8 +180,7 @@ typedef struct ls_node
 typedef struct ls_ast
 {
 	ls_node_t *nodes;
-	uint8_t *types; // ls_nodetype_t (parse).
-	uint8_t *typeinfo; // ls_primtype_t (sema).
+	uint8_t *types;
 	uint32_t nnodes, nodecap;
 } ls_ast_t;
 
@@ -221,6 +220,7 @@ extern char *(*ls_strdup)(char const *);
 extern char const *ls_toknames[LS_TOKTYPE_END];
 extern char const *ls_nodenames[LS_NODETYPE_END];
 extern char const *ls_primtypenames[LS_PRIMTYPE_END];
+extern ls_primtype_t ls_toktoprim[LS_TOKTYPE_END];
 
 //------------//
 // procedures //
@@ -245,21 +245,20 @@ uint32_t ls_addnode(ls_ast_t *a, ls_nodetype_t type);
 void ls_parentnode(ls_ast_t *a, uint32_t parent, uint32_t child);
 void ls_printast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
 void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
-void ls_printtypedast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
-void ls_printtypednode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
 void ls_destroyast(ls_ast_t *a);
 
 // sema.
 ls_module_t ls_createmodule(ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
 ls_err_t ls_resolveimports(ls_module_t *m, char const *paths[], size_t npaths);
 void ls_pushmodule(ls_module_t *m, ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
-void ls_printmoduleasts(FILE *fp, ls_module_t const *m);
+void ls_printmodule(FILE *fp, ls_module_t const *m);
 void ls_destroymodule(ls_module_t *m);
-ls_err_t ls_gentypeinfo(ls_module_t *m);
-void ls_printmoduletypedasts(FILE *fp, ls_module_t const *m);
+ls_err_t ls_sema(ls_module_t *m);
 ls_symtab_t ls_createsymtab(void);
 int64_t ls_findsym(ls_symtab_t const *st, char const *sym);
 void ls_pushsym(ls_symtab_t *st, char *sym, ls_primtype_t type, uint32_t mod, uint32_t node, uint16_t scope);
 void ls_destroysymtab(ls_symtab_t *st);
+void ls_popsymscope(ls_symtab_t *st, uint16_t scope);
+uint16_t ls_newscope(ls_symtab_t const *st);
 
 #endif

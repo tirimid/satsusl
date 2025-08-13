@@ -40,6 +40,10 @@ a_proc(i32 argc, char *argv[])
 			{
 				a_args.target = A_IMPORT;
 			}
+			else if (!strcmp(optarg, "sema"))
+			{
+				a_args.target = A_SEMA;
+			}
 			else
 			{
 				err("args: unknown argument for -t - %s!", optarg);

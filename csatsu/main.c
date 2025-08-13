@@ -78,9 +78,11 @@ main(int argc, char *argv[])
 	
 	if (a_args.target == A_IMPORT)
 	{
-		ls_printmoduleasts(stdout, &mod);
+		ls_printmodule(stdout, &mod);
 		return 0;
 	}
+	
+	// TODO: add sema stage.
 	
 	return 0;
 }

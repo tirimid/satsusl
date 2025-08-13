@@ -7,7 +7,8 @@ typedef enum a_target
 	A_EXEC = 0,
 	A_LEX,
 	A_PARSE,
-	A_IMPORT
+	A_IMPORT,
+	A_SEMA
 } a_target_t;
 
 typedef struct a_args

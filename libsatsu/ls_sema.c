@@ -12,7 +12,18 @@ char const *ls_primtypenames[LS_PRIMTYPE_END] =
 	"func"
 };
 
-static ls_err_t ls_typefunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st);
+ls_primtype_t ls_toktoprim[LS_TOKTYPE_END] =
+{
+	[LS_KWINT] = LS_INT,
+	[LS_KWREAL] = LS_REAL,
+	[LS_KWSTRING] = LS_STRING,
+	[LS_KWBOOL] = LS_BOOL,
+	[LS_KWVOID] = LS_VOID
+};
+
+static ls_err_t ls_redefinition(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, ls_tok_t cur, int64_t prev);
+static ls_err_t ls_semafunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st);
+static ls_err_t ls_semastmt(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st);
 
 // *out takes ownership of *a, *l, name[0:strlen(name)], and data[0:len].
 ls_module_t
@@ -204,7 +215,7 @@ ls_pushmodule(
 }
 
 void
-ls_printmoduleasts(FILE *fp, ls_module_t const *m)
+ls_printmodule(FILE *fp, ls_module_t const *m)
 {
 	for (size_t i = 0; i < m->nmods; ++i)
 	{
@@ -224,40 +235,21 @@ ls_destroymodule(ls_module_t *m)
 		ls_destroyast(&m->asts[i]);
 	}
 	
-	if (m->names)
-	{
-		free(m->names);
-	}
-	if (m->ids)
-	{
-		free(m->ids);
-	}
-	if (m->data)
-	{
-		free(m->data);
-	}
-	if (m->lens)
-	{
-		free(m->lens);
-	}
-	if (m->lexes)
-	{
-		free(m->lexes);
-	}
-	if (m->asts)
-	{
-		free(m->asts);
-	}
+	free(m->names);
+	free(m->ids);
+	free(m->data);
+	free(m->lens);
+	free(m->lexes);
+	free(m->asts);
 }
 
 ls_err_t
-ls_gentypeinfo(ls_module_t *m)
+ls_sema(ls_module_t *m)
 {
 	// set initial null typeinfo and create global symtab.
 	ls_symtab_t st = ls_createsymtab();
 	for (size_t i = 0; i < m->nmods; ++i)
 	{
-		memset(m->asts[i].typeinfo, 0, m->asts[i].nnodes);
 		for (size_t j = 0; j < m->asts[i].nnodes; ++j)
 		{
 			if (m->asts[i].types[j] != LS_FUNCDECL)
@@ -267,41 +259,41 @@ ls_gentypeinfo(ls_module_t *m)
 			
 			ls_tok_t tok = m->lexes[i].toks[m->asts[i].nodes[j].tok];
 			
-			char sym[LS_MAXIDENT + 1];
+			char sym[LS_MAXIDENT + 1] = {0};
 			ls_readtokraw(sym, m->data[i], tok);
 			
 			int64_t prev = ls_findsym(&st, sym);
 			if (prev != -1)
 			{
-				size_t prevmod = st.mods[prev], prevnode = st.nodes[prev];
-				ls_tok_t prevtok = m->lexes[prevmod].toks[m->asts[prevmod].nodes[prevnode].tok];
-				
-				char msg[256];
-				sprintf(msg, "previously defined at %u+%u in %s", prevtok.pos, prevtok.len, m->names[prevmod]);
-				
+				ls_err_t e = ls_redefinition(m, i, &st, tok, prev);
 				ls_destroysymtab(&st);
-				
-				return (ls_err_t)
-				{
-					.code = 1,
-					.src = i,
-					.pos = tok.pos,
-					.len = tok.len,
-					.msg = ls_strdup(msg)
-				};
+				return e;
 			}
 			
 			ls_pushsym(&st, ls_strdup(sym), LS_FUNC, i, j, 0);
 		}
 	}
 	
+	// generate typeinfo for functions.
+	for (size_t i = 0; i < m->nmods; ++i)
+	{
+		for (size_t j = 0; j < m->asts[i].nnodes; ++j)
+		{
+			if (m->asts[i].types[j] != LS_FUNCDECL)
+			{
+				continue;
+			}
+			
+			ls_err_t e = ls_semafunc(m, i, j, &st);
+			if (e.code)
+			{
+				ls_destroysymtab(&st);
+				return e;
+			}
+		}
+	}
+	
 	return (ls_err_t){0};
-}
-
-void
-ls_printmoduletypedasts(FILE *fp, ls_module_t const *m)
-{
-	// TODO: implement ls_printmoduletypedasts().
 }
 
 ls_symtab_t
@@ -341,7 +333,22 @@ ls_pushsym(
 	uint16_t scope
 )
 {
-	// TODO: implement ls_pushsym().
+	if (st->nsyms >= st->symcap)
+	{
+		st->symcap *= 2;
+		st->syms = ls_reallocarray(st->syms, st->symcap, sizeof(char *));
+		st->types = ls_reallocarray(st->types, st->symcap, 1);
+		st->mods = ls_reallocarray(st->mods, st->symcap, sizeof(uint32_t));
+		st->nodes = ls_reallocarray(st->nodes, st->symcap, sizeof(uint32_t));
+		st->scopes = ls_reallocarray(st->scopes, st->symcap, sizeof(uint16_t));
+	}
+	
+	st->syms[st->nsyms] = sym;
+	st->types[st->nsyms] = type;
+	st->mods[st->nsyms] = mod;
+	st->nodes[st->nsyms] = node;
+	st->scopes[st->nsyms] = scope;
+	++st->nsyms;
 }
 
 void
@@ -352,30 +359,97 @@ ls_destroysymtab(ls_symtab_t *st)
 		ls_free(st->syms[i]);
 	}
 	
-	if (st->syms)
+	ls_free(st->syms);
+	ls_free(st->types);
+	ls_free(st->mods);
+	ls_free(st->nodes);
+	ls_free(st->scopes);
+}
+
+void
+ls_popsymscope(ls_symtab_t *st, uint16_t scope)
+{
+	while (st->nsyms && st->scopes[st->nsyms - 1] >= scope)
 	{
-		ls_free(st->syms);
-	}
-	if (st->types)
-	{
-		ls_free(st->types);
-	}
-	if (st->mods)
-	{
-		ls_free(st->mods);
-	}
-	if (st->nodes)
-	{
-		ls_free(st->nodes);
-	}
-	if (st->scopes)
-	{
-		ls_free(st->scopes);
+		--st->nsyms;
+		ls_free(st->syms[st->nsyms]);
 	}
 }
 
-static ls_err_t
-ls_typefunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
+uint16_t
+ls_newscope(ls_symtab_t const *st)
 {
-	// TODO: implement ls_typefunc().
+	return st->nsyms ? st->scopes[st->nsyms - 1] + 1 : 0;
+}
+
+static ls_err_t
+ls_redefinition(
+	ls_module_t const *m,
+	uint32_t mod,
+	ls_symtab_t const *st,
+	ls_tok_t cur,
+	int64_t prev
+)
+{
+	size_t prevmod = st->mods[prev], prevnode = st->nodes[prev];
+	ls_tok_t prevtok = m->lexes[prevmod].toks[m->asts[prevmod].nodes[prevnode].tok];
+	
+	char msg[256];
+	sprintf(msg, "previously defined at %u+%u in %s", prevtok.pos, prevtok.len, m->names[prevmod]);
+	
+	return (ls_err_t)
+	{
+		.code = 1,
+		.src = mod,
+		.pos = cur.pos,
+		.len = cur.len,
+		.msg = ls_strdup(msg)
+	};
+}
+
+static ls_err_t
+ls_semafunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
+{
+	uint16_t scope = ls_newscope(st);
+	
+	ls_lex_t *l = &m->lexes[mod];
+	ls_ast_t *a = &m->asts[mod];
+	
+	uint32_t narglist = a->nodes[node].children[1];
+	uint32_t nbody = a->nodes[node].children[2];
+	
+	for (size_t i = 0; i < a->nodes[narglist].nchildren; ++i)
+	{
+		uint32_t narg = a->nodes[narglist].children[i];
+		uint32_t nargtype = a->nodes[narg].children[0];
+		
+		ls_tok_t argtok = l->toks[a->nodes[narg].tok];
+		ls_toktype_t argtypetok = l->types[a->nodes[nargtype].tok];
+		
+		char sym[LS_MAXIDENT + 1] = {0};
+		ls_readtokraw(sym, m->data[mod], argtok);
+		
+		int64_t prev = ls_findsym(st, sym);
+		if (prev != -1)
+		{
+			return ls_redefinition(m, mod, st, argtok, prev);
+		}
+		
+		ls_pushsym(st, ls_strdup(sym), ls_toktoprim[l->types[argtypetok]], mod, narg, scope);
+	}
+	
+	ls_err_t e = ls_semastmt(m, mod, nbody, st);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_popsymscope(st, scope);
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semastmt(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
+{
+	// TODO: implement ls_semastmt().
 }
