@@ -15,6 +15,7 @@
 
 #define LS_NULL 0
 #define LS_MAXIDENT 63
+#define LS_BATCHALIGN 16
 
 //--------------------//
 // enumeration values //
@@ -158,6 +159,12 @@ typedef struct ls_err
 	char *msg;
 } ls_err_t;
 
+typedef struct ls_allocbatch
+{
+	void **ptr;
+	size_t n, size;
+} ls_allocbatch_t;
+
 typedef struct ls_tok
 {
 	uint32_t pos, len;
@@ -165,6 +172,7 @@ typedef struct ls_tok
 
 typedef struct ls_lex
 {
+	void *buf;
 	ls_tok_t *toks;
 	uint8_t *types;
 	uint32_t ntoks, tokcap;
@@ -179,6 +187,7 @@ typedef struct ls_node
 
 typedef struct ls_ast
 {
+	void *buf;
 	ls_node_t *nodes;
 	uint8_t *types;
 	uint32_t nnodes, nodecap;
@@ -208,8 +217,8 @@ typedef struct ls_symtab
 // library configuration //
 //-----------------------//
 
-extern void *(*ls_calloc)(size_t, size_t);
-extern void *(*ls_reallocarray)(void *, size_t, size_t);
+extern void *(*ls_malloc)(size_t);
+extern void *(*ls_realloc)(void *, size_t);
 extern void (*ls_free)(void *);
 extern char *(*ls_strdup)(char const *);
 
@@ -230,6 +239,9 @@ extern ls_primtype_t ls_toktoprim[LS_TOKTYPE_END];
 void ls_destroyerr(ls_err_t *err);
 ls_err_t ls_readfile(FILE *fp, char **outdata, uint32_t *outlen);
 uint64_t ls_fileid(char const *file, bool deref);
+uint64_t ls_alignbatch(uint64_t n);
+void *ls_allocbatch(ls_allocbatch_t *allocs, size_t nallocs);
+void *ls_reallocbatch(ls_allocbatch_t *new, ls_allocbatch_t const *old, size_t n);
 
 // lex.
 ls_err_t ls_lex(ls_lex_t *out, char const *data, uint32_t len);

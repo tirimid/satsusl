@@ -310,14 +310,7 @@ ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type)
 void
 ls_destroylex(ls_lex_t *l)
 {
-	if (l->toks)
-	{
-		ls_free(l->toks);
-	}
-	if (l->types)
-	{
-		ls_free(l->types);
-	}
+	ls_free(l->buf);
 }
 
 static ls_err_t

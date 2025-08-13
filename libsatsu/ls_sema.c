@@ -451,5 +451,12 @@ ls_semafunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
 static ls_err_t
 ls_semastmt(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
 {
+	(void)m;
+	(void)mod;
+	(void)node;
+	(void)st;
+	
 	// TODO: implement ls_semastmt().
+	
+	__builtin_unreachable();
 }

@@ -19,7 +19,7 @@
 #include "ls_sema.c"
 #include "ls_util.c"
 
-void *(*ls_calloc)(size_t, size_t) = calloc;
-void *(*ls_reallocarray)(void *, size_t, size_t) = reallocarray;
+void *(*ls_malloc)(size_t) = malloc;
+void *(*ls_realloc)(void *, size_t) = realloc;
 void (*ls_free)(void *) = free;
 char *(*ls_strdup)(char const *) = strdup;

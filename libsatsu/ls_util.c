@@ -66,3 +66,42 @@ ls_fileid(char const *file, bool deref)
 	
 	return stat.st_ino;
 }
+
+uint64_t
+ls_alignbatch(uint64_t n)
+{
+	return n + LS_BATCHALIGN - n % LS_BATCHALIGN;
+}
+
+void *
+ls_allocbatch(ls_allocbatch_t *allocs, size_t nallocs)
+{
+	size_t size = 0;
+	for (size_t i = 0; i < nallocs; ++i)
+	{
+		size += allocs[i].n * allocs[i].size;
+		size = ls_alignbatch(size);
+	}
+	
+	uint8_t *ptr = ls_malloc(size);
+	if (!ptr)
+	{
+		return NULL;
+	}
+	
+	size_t offset = 0;
+	for (size_t i = 0; i < nallocs; ++i)
+	{
+		*allocs[i].ptr = &ptr[offset];
+		offset += allocs[i].n * allocs[i].size;
+		offset = ls_alignbatch(offset);
+	}
+	
+	return ptr;
+}
+
+void *
+ls_reallocbatch(ls_allocbatch_t *new, ls_allocbatch_t const *old, size_t n)
+{
+	// TODO: implement ls_reallocbatch().
+}
