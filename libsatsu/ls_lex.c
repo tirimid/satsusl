@@ -357,7 +357,7 @@ ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
 			.code = 1,
 			.pos = begin,
 			.len = end - begin,
-			.msg = ls_strdup("identifier exceeds " LS_STRINGIFY(LS_MAXIDENT) " characters")
+			.msg = ls_strdup("identifier exceeds " STRINGIFY(LS_MAXIDENT) " characters")
 		};
 	}
 	

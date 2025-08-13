@@ -35,11 +35,11 @@ then
 	exit 1
 fi
 
-echo "[$0] install: copying headers" >&2
-cp libsatsu/*.h $INSTALLHEADER
+echo "[$0] install: copying header" >&2
+cp libsatsu/satsu.h $INSTALLHEADER
 if [ $? -ne 0 ]
 then
-	echo "[$0] install: failed to copy headers!" >&2
+	echo "[$0] install: failed to copy header!" >&2
 	exit 1
 fi
 

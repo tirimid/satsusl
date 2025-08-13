@@ -9,18 +9,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-//--------------//
-// value macros //
-//--------------//
+//--------//
+// macros //
+//--------//
 
 #define LS_NULL 0
 #define LS_MAXIDENT 63
-
-//----------------------//
-// util function macros //
-//----------------------//
-
-#define LS_STRINGIFY(s) #s
 
 //--------------------//
 // enumeration values //
