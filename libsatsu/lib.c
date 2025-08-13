@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-// global util macros.
-#define LS_STRINGIFY(s) #s
-
 // standard library.
 #include <ctype.h>
 #include <limits.h>

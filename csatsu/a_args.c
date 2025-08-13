@@ -66,5 +66,16 @@ a_proc(i32 argc, char *argv[])
 static void
 a_usage(char const *name)
 {
-	// TODO: implement usage text.
+	printf(
+		"csatsu - command-line interface for libsatsu\n"
+		"\n"
+		"Usage:\n"
+		"\t%s [options] file\n"
+		"\n"
+		"Options:\n"
+		"\t-h        Display help information\n"
+		"\t-m dir    Register import path\n"
+		"\t-t stage  Terminate execution at an early stage\n",
+		name
+	);
 }
