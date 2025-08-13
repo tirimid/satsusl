@@ -4,7 +4,6 @@ typedef struct ls_pstate
 {
 	ls_lex_t const *lex;
 	ls_ast_t *ast;
-	char const *name;
 	uint32_t cur;
 } ls_pstate_t;
 
@@ -136,7 +135,7 @@ static ls_pratt_t ls_pratt[LS_TOKTYPE_END] =
 };
 
 ls_err_t
-ls_parse(ls_ast_t *out, ls_lex_t const *l, char const *name)
+ls_parse(ls_ast_t *out, ls_lex_t const *l)
 {
 	ls_ast_t a =
 	{
@@ -149,7 +148,6 @@ ls_parse(ls_ast_t *out, ls_lex_t const *l, char const *name)
 	{
 		.lex = l,
 		.ast = &a,
-		.name = name,
 		.cur = 0
 	};
 	
@@ -271,7 +269,6 @@ ls_requiretok(ls_pstate_t *p, ls_toktype_t *out)
 			.code = 1,
 			.pos = lasttok.pos + lasttok.len,
 			.len = 1,
-			.src = ls_strdup(p->name),
 			.msg = ls_strdup("required a token, found EOF")
 		};
 	}
@@ -291,7 +288,6 @@ ls_expecttok(ls_pstate_t *p, ls_toktype_t type)
 			.code = 1,
 			.pos = lasttok.pos + lasttok.len,
 			.len = 1,
-			.src = ls_strdup(p->name),
 			.msg = ls_strdup("expected a token, found EOF")
 		};
 	}
@@ -306,7 +302,6 @@ ls_expecttok(ls_pstate_t *p, ls_toktype_t type)
 			.code = 1,
 			.pos = tok.pos,
 			.len = tok.len,
-			.src = ls_strdup(p->name),
 			.msg = ls_strdup(msg)
 		};
 	}
@@ -349,7 +344,6 @@ ls_parseroot(ls_pstate_t *p, uint32_t *out)
 				.code = 1,
 				.pos = tok.pos,
 				.len = tok.len,
-				.src = ls_strdup(p->name),
 				.msg = ls_strdup("expected a root element")
 			};
 		}
@@ -520,7 +514,6 @@ ls_parsearglist(ls_pstate_t *p, uint32_t *out)
 				.code = 1,
 				.pos = tok.pos,
 				.len = tok.len,
-				.src = ls_strdup(p->name),
 				.msg = ls_strdup("expected ) or ,")
 			};
 		}
@@ -903,7 +896,6 @@ ls_parseexpr(
 				.code = 1,
 				.pos = tok.pos,
 				.len = tok.len,
-				.src = ls_strdup(p->name),
 				.msg = ls_strdup("expected null denotation")
 			};
 		}
@@ -937,7 +929,6 @@ ls_parseexpr(
 				.code = 1,
 				.pos = tok.pos,
 				.len = tok.len,
-				.src = ls_strdup(p->name),
 				.msg = ls_strdup("expected left denotation")
 			};
 		}
@@ -1127,7 +1118,6 @@ ls_parsetype(ls_pstate_t *p, uint32_t *out)
 			.code = 1,
 			.pos = tok.pos,
 			.len = tok.pos,
-			.src = ls_strdup(p->name),
 			.msg = ls_strdup("expected type")
 		};
 	}

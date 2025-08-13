@@ -5,6 +5,7 @@
 
 // standard library.
 #include <ctype.h>
+#include <limits.h>
 #include <string.h>
 
 // system dependencies.
@@ -17,6 +18,7 @@
 // project source.
 #include "ls_lex.c"
 #include "ls_parse.c"
+#include "ls_sema.c"
 #include "ls_util.c"
 
 void *(*ls_calloc)(size_t, size_t) = calloc;

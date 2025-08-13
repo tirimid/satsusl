@@ -8,13 +8,21 @@ void
 a_proc(i32 argc, char *argv[])
 {
 	i32 ch;
-	while (ch = getopt(argc, (char *const *)argv, "ht:"), ch != -1)
+	while (ch = getopt(argc, (char *const *)argv, "hm:t:"), ch != -1)
 	{
 		switch (ch)
 		{
 		case 'h':
 			a_usage(argv[0]);
 			exit(0);
+		case 'm':
+			if (a_args.npaths >= A_MAXPATHS)
+			{
+				err("args: cannot have more than " STRINGIFY(A_MAXPATHS) " module paths!");
+			}
+			// TODO: verify that optarg is non-empty.
+			a_args.paths[a_args.npaths++] = optarg;
+			break;
 		case 't':
 			if (!strcmp(optarg, "exec"))
 			{
@@ -27,6 +35,10 @@ a_proc(i32 argc, char *argv[])
 			else if (!strcmp(optarg, "parse"))
 			{
 				a_args.target = A_PARSE;
+			}
+			else if (!strcmp(optarg, "import"))
+			{
+				a_args.target = A_IMPORT;
 			}
 			else
 			{

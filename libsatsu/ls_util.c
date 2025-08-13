@@ -3,10 +3,6 @@
 void
 ls_destroyerr(ls_err_t *err)
 {
-	if (err->src)
-	{
-		ls_free(err->src);
-	}
 	if (err->msg)
 	{
 		ls_free(err->msg);
@@ -14,7 +10,7 @@ ls_destroyerr(ls_err_t *err)
 }
 
 ls_err_t
-ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen)
+ls_readfile(FILE *fp, char **outdata, uint32_t *outlen)
 {
 	fseek(fp, 0, SEEK_END);
 	ssize_t len = ftell(fp);

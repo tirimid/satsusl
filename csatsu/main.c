@@ -25,18 +25,18 @@ main(int argc, char *argv[])
 	a_proc(argc, argv);
 	
 	char *filedata;
-	usize filelen;
-	ls_err_t e = ls_readfile(a_args.infp, a_args.infile, &filedata, &filelen);
+	u32 filelen;
+	ls_err_t e = ls_readfile(a_args.infp, &filedata, &filelen);
 	if (e.code)
 	{
-		err("main: failed to read file %s - %s!", e.src, e.msg);
+		err("main: failed to read file %s - %s!", a_args.infile, e.msg);
 	}
 	
 	ls_lex_t lex;
-	e = ls_lex(&lex, a_args.infile, filedata, filelen);
+	e = ls_lex(&lex, filedata, filelen);
 	if (e.code)
 	{
-		errfile(e.src, filedata, filelen, e.pos, e.len, "main: lex failed - %s!", e.msg);
+		errfile(a_args.infile, filedata, filelen, e.pos, e.len, "main: lex failed - %s!", e.msg);
 	}
 	
 	if (a_args.target == A_LEX)
@@ -49,15 +49,36 @@ main(int argc, char *argv[])
 	}
 	
 	ls_ast_t ast;
-	e = ls_parse(&ast, &lex, a_args.infile);
+	e = ls_parse(&ast, &lex);
 	if (e.code)
 	{
-		errfile(e.src, filedata, filelen, e.pos, e.len, "main: parse failed - %s!", e.msg);
+		errfile(a_args.infile, filedata, filelen, e.pos, e.len, "main: parse failed - %s!", e.msg);
 	}
 	
 	if (a_args.target == A_PARSE)
 	{
 		ls_printast(stdout, &ast, &lex);
+		return 0;
+	}
+	
+	ls_module_t mod = ls_createmodule(
+		&ast,
+		&lex,
+		strdup(a_args.infile),
+		ls_fileid(a_args.infile, true),
+		filedata,
+		filelen
+	);
+	
+	e = ls_resolveimports(&mod, a_args.paths, a_args.npaths);
+	if (e.code)
+	{
+		errfile(a_args.infile, filedata, filelen, e.pos, e.len, "main: import resolution failed - %s!", e.msg);
+	}
+	
+	if (a_args.target == A_IMPORT)
+	{
+		ls_printmoduleasts(stdout, &mod);
 		return 0;
 	}
 	

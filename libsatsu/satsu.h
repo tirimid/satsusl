@@ -149,7 +149,7 @@ typedef struct ls_err
 {
 	int32_t code;
 	uint32_t pos, len;
-	size_t src_;
+	size_t src;
 	char *msg;
 } ls_err_t;
 
@@ -184,7 +184,7 @@ typedef struct ls_module
 	char **names;
 	uint64_t *ids;
 	char **data;
-	uint32_t **lens;
+	uint32_t *lens;
 	ls_lex_t *lexes;
 	ls_ast_t *asts;
 	size_t nmods, modcap;
@@ -213,19 +213,19 @@ extern char const *ls_primtypenames[LS_PRIMTYPE_END];
 
 // util.
 void ls_destroyerr(ls_err_t *err);
-ls_err_t ls_readfile(FILE *fp, char const *name, char **outdata, size_t *outlen);
+ls_err_t ls_readfile(FILE *fp, char **outdata, uint32_t *outlen);
 uint64_t ls_fileid(char const *file, bool deref);
 
 // lex.
-ls_err_t ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len);
+ls_err_t ls_lex(ls_lex_t *out, char const *data, uint32_t len);
 void ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len);
-void ls_readtokraw(char out[], char const *data, ls_tok_t const *t);
-void ls_readtokstr(char out[], char const *data, ls_tok_t const *t);
+void ls_readtokraw(char out[], char const *data, ls_tok_t tok);
+void ls_readtokstr(char out[], size_t *outlen, char const *data, ls_tok_t tok);
 void ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type);
 void ls_destroylex(ls_lex_t *l);
 
 // parse.
-ls_err_t ls_parse(ls_ast_t *out, ls_lex_t const *l, char const *name);
+ls_err_t ls_parse(ls_ast_t *out, ls_lex_t const *l);
 uint32_t ls_addnode(ls_ast_t *a, ls_nodetype_t type);
 void ls_parentnode(ls_ast_t *a, uint32_t parent, uint32_t child);
 void ls_printast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
@@ -233,9 +233,10 @@ void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n
 void ls_destroyast(ls_ast_t *a);
 
 // sema.
-ls_err_t ls_buildmodule(ls_module_t *out, ls_ast_t *a, ls_lex_t *l, char const *name, uint64_t id, char *data, uint32_t len, char const *paths[], size_t npaths);
+ls_module_t ls_createmodule(ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
+ls_err_t ls_resolveimports(ls_module_t *m, char const *paths[], size_t npaths);
 void ls_pushmodule(ls_module_t *m, ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
-void ls_printmodule(FILE *fp, ls_module_t const *m);
+void ls_printmoduleasts(FILE *fp, ls_module_t const *m);
 void ls_destroymodule(ls_module_t *m);
 
 #endif

@@ -63,13 +63,13 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	"%="
 };
 
-static ls_err_t ls_lexword(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
-static ls_err_t ls_lexstr(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
-static ls_err_t ls_lexnum(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i);
+static ls_err_t ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i);
+static ls_err_t ls_lexstr(ls_lex_t *l, char const *data, uint32_t len, size_t *i);
+static ls_err_t ls_lexnum(ls_lex_t *l, char const *data, uint32_t len, size_t *i);
 static void ls_lexcomment(char const *data, uint32_t len, size_t *i);
 
 ls_err_t
-ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
+ls_lex(ls_lex_t *out, char const *data, uint32_t len)
 {
 	ls_lex_t l =
 	{
@@ -87,7 +87,7 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		}
 		else if (isalpha(data[i]) || data[i] == '_')
 		{
-			ls_err_t err = ls_lexword(&l, name, data, len, &i);
+			ls_err_t err = ls_lexword(&l, data, len, &i);
 			if (err.code)
 			{
 				ls_destroylex(&l);
@@ -96,7 +96,7 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		}
 		else if (data[i] == '"')
 		{
-			ls_err_t err = ls_lexstr(&l, name, data, len, &i);
+			ls_err_t err = ls_lexstr(&l, data, len, &i);
 			if (err.code)
 			{
 				ls_destroylex(&l);
@@ -105,7 +105,7 @@ ls_lex(ls_lex_t *out, char const *name, char const *data, uint32_t len)
 		}
 		else if (isdigit(data[i]))
 		{
-			ls_err_t err = ls_lexnum(&l, name, data, len, &i);
+			ls_err_t err = ls_lexnum(&l, data, len, &i);
 			if (err.code)
 			{
 				ls_destroylex(&l);
@@ -285,14 +285,19 @@ ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 }
 
 void
-ls_readtokraw(char out[], char const *data, ls_tok_t const *t)
+ls_readtokraw(char out[], char const *data, ls_tok_t tok)
 {
-	memcpy(out, &data[t->pos], t->len);
+	memcpy(out, &data[tok.pos], tok.len);
 }
 
 void
-ls_readtokstr(char out[], char const *data, ls_tok_t const *t)
+ls_readtokstr(char out[], size_t *outlen, char const *data, ls_tok_t tok)
 {
+	(void)out;
+	(void)outlen;
+	(void)data;
+	(void)tok;
+	
 	// TODO: implement ls_readtokstr().
 }
 
@@ -316,7 +321,7 @@ ls_destroylex(ls_lex_t *l)
 }
 
 static ls_err_t
-ls_lexword(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t *i)
+ls_lexword(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
 {
 	size_t begin = *i;
 	
@@ -362,13 +367,7 @@ ls_lexword(ls_lex_t *l, char const *name, char const *data, uint32_t len, size_t
 }
 
 static ls_err_t
-ls_lexstr(
-	ls_lex_t *l,
-	char const *name,
-	char const *data,
-	uint32_t len,
-	size_t *i
-)
+ls_lexstr(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
 {
 	size_t begin = *i;
 	
@@ -412,13 +411,7 @@ ls_lexstr(
 }
 
 static ls_err_t
-ls_lexnum(
-	ls_lex_t *l,
-	char const *name,
-	char const *data,
-	uint32_t len,
-	size_t *i
-)
+ls_lexnum(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
 {
 	size_t begin = *i;
 	
