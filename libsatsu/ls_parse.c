@@ -139,10 +139,15 @@ ls_parse(ls_ast_t *out, ls_lex_t const *l)
 {
 	ls_ast_t a =
 	{
-		.nodes = ls_calloc(1, sizeof(ls_node_t)),
-		.types = ls_calloc(1, 1),
 		.nodecap = 1
 	};
+	
+	ls_allocbatch_t allocs[] =
+	{
+		{(void **)&a.nodes, 1, sizeof(ls_node_t)},
+		{(void **)&a.types, 1, sizeof(uint8_t)}
+	};
+	a.buf = ls_allocbatch(allocs, ARRSIZE(allocs));
 	
 	ls_pstate_t p =
 	{
@@ -168,9 +173,14 @@ ls_addnode(ls_ast_t *a, ls_nodetype_t type)
 {
 	if (a->nnodes >= a->nodecap)
 	{
+		ls_reallocbatch_t reallocs[] =
+		{
+			{(void **)&a->nodes, a->nodecap, 2 * a->nodecap, sizeof(ls_node_t)},
+			{(void **)&a->types, a->nodecap, 2 * a->nodecap, sizeof(uint8_t)}
+		};
+		
+		a->buf = ls_reallocbatch(a->buf, reallocs, ARRSIZE(reallocs));
 		a->nodecap *= 2;
-		a->nodes = ls_reallocarray(a->nodes, a->nodecap, sizeof(ls_node_t));
-		a->types = ls_reallocarray(a->types, a->nodecap, 1);
 	}
 	
 	a->nodes[a->nnodes] = (ls_node_t)
@@ -241,9 +251,7 @@ ls_destroyast(ls_ast_t *a)
 	{
 		ls_free(a->nodes[i].children);
 	}
-	
-	ls_free(a->nodes);
-	ls_free(a->types);
+	ls_free(a->buf);
 }
 
 static ls_toktype_t

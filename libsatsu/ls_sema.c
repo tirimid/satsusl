@@ -38,15 +38,22 @@ ls_createmodule(
 {
 	ls_module_t m =
 	{
-		.names = ls_calloc(1, sizeof(char *)),
-		.ids = ls_calloc(1, sizeof(uint64_t)),
-		.data = ls_calloc(1, sizeof(char *)),
-		.lens = ls_calloc(1, sizeof(uint32_t)),
-		.lexes = ls_calloc(1, sizeof(ls_lex_t)),
-		.asts = ls_calloc(1, sizeof(ls_ast_t)),
 		.modcap = 1
 	};
+	
+	ls_allocbatch_t allocs[] =
+	{
+		{(void **)&m.names, 1, sizeof(char *)},
+		{(void **)&m.ids, 1, sizeof(uint64_t)},
+		{(void **)&m.data, 1, sizeof(char *)},
+		{(void **)&m.lens, 1, sizeof(uint32_t)},
+		{(void **)&m.lexes, 1, sizeof(ls_lex_t)},
+		{(void **)&m.asts, 1, sizeof(ls_ast_t)}
+	};
+	m.buf = ls_allocbatch(allocs, ARRSIZE(allocs));
+	
 	ls_pushmodule(&m, a, l, name, id, data, len);
+	
 	return m;
 }
 
@@ -196,13 +203,18 @@ ls_pushmodule(
 {
 	if (m->nmods >= m->modcap)
 	{
+		ls_reallocbatch_t reallocs[] =
+		{
+			{(void **)&m->names, m->modcap, 2 * m->modcap, sizeof(char *)},
+			{(void **)&m->ids, m->modcap, 2 * m->modcap, sizeof(uint64_t)},
+			{(void **)&m->data, m->modcap, 2 * m->modcap, sizeof(char *)},
+			{(void **)&m->lens, m->modcap, 2 * m->modcap, sizeof(uint32_t)},
+			{(void **)&m->lexes, m->modcap, 2 * m->modcap, sizeof(ls_lex_t)},
+			{(void **)&m->asts, m->modcap, 2 * m->modcap, sizeof(ls_ast_t)}
+		};
+		
 		m->modcap *= 2;
-		m->names = ls_reallocarray(m->names, m->modcap, sizeof(char *));
-		m->ids = ls_reallocarray(m->ids, m->modcap, sizeof(uint64_t));
-		m->data = ls_reallocarray(m->data, m->modcap, sizeof(char *));
-		m->lens = ls_reallocarray(m->lens, m->modcap, sizeof(uint32_t));
-		m->lexes = ls_reallocarray(m->lexes, m->modcap, sizeof(ls_lex_t));
-		m->asts = ls_reallocarray(m->asts, m->modcap, sizeof(ls_ast_t));
+		m->buf = ls_reallocbatch(m->buf, reallocs, ARRSIZE(reallocs));
 	}
 	
 	m->names[m->nmods] = name;
@@ -377,6 +389,12 @@ ls_popsymscope(ls_symtab_t *st, uint16_t scope)
 }
 
 uint16_t
+ls_curscope(ls_symtab_t const *st)
+{
+	return st->nsyms ? st->scopes[st->nsyms - 1] : 0;
+}
+
+uint16_t
 ls_newscope(ls_symtab_t const *st)
 {
 	return st->nsyms ? st->scopes[st->nsyms - 1] + 1 : 0;
@@ -435,7 +453,20 @@ ls_semafunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
 			return ls_redefinition(m, mod, st, argtok, prev);
 		}
 		
-		ls_pushsym(st, ls_strdup(sym), ls_toktoprim[l->types[argtypetok]], mod, narg, scope);
+		ls_primtype_t primtype = ls_toktoprim[l->types[argtypetok]];
+		if (primtype == LS_VOID)
+		{
+			return (ls_err_t)
+			{
+				.code = 1,
+				.src = mod,
+				.pos = argtok.pos,
+				.len = argtok.len,
+				.msg = ls_strdup("function arguments cannot be void")
+			};
+		}
+		
+		ls_pushsym(st, ls_strdup(sym), primtype, mod, narg, scope);
 	}
 	
 	ls_err_t e = ls_semastmt(m, mod, nbody, st);
@@ -458,5 +489,5 @@ ls_semastmt(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
 	
 	// TODO: implement ls_semastmt().
 	
-	__builtin_unreachable();
+	return (ls_err_t){0};
 }

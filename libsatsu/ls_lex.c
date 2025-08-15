@@ -73,10 +73,16 @@ ls_lex(ls_lex_t *out, char const *data, uint32_t len)
 {
 	ls_lex_t l =
 	{
-		.toks = ls_calloc(1, sizeof(ls_tok_t)),
-		.types = ls_calloc(1, 1),
 		.tokcap = 1
 	};
+	
+	ls_allocbatch_t allocs[] =
+	{
+		{(void **)&l.toks, 1, sizeof(ls_tok_t)},
+		{(void **)&l.types, 1, sizeof(uint8_t)}
+	};
+	l.buf = ls_allocbatch(allocs, ARRSIZE(allocs));
+	
 	ls_addtok(&l, LS_NULL, 0, 0);
 	
 	for (size_t i = 0; i < len; ++i)
@@ -270,9 +276,14 @@ ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 {
 	if (l->ntoks >= l->tokcap)
 	{
+		ls_reallocbatch_t reallocs[] =
+		{
+			{(void **)&l->toks, l->tokcap, 2 * l->tokcap, sizeof(ls_tok_t)},
+			{(void **)&l->types, l->tokcap, 2 * l->tokcap, sizeof(uint8_t)}
+		};
+		
+		l->buf = ls_reallocbatch(l->buf, reallocs, ARRSIZE(reallocs));
 		l->tokcap *= 2;
-		l->toks = ls_reallocarray(l->toks, l->tokcap, sizeof(ls_tok_t)),
-		l->types = ls_reallocarray(l->types, l->tokcap, 1);
 	}
 	
 	l->toks[l->ntoks] = (ls_tok_t)
@@ -287,7 +298,7 @@ ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len)
 void
 ls_readtokraw(char out[], char const *data, ls_tok_t tok)
 {
-	memcpy(out, &data[tok.pos], tok.len);
+	ls_memcpy(out, &data[tok.pos], tok.len);
 }
 
 void

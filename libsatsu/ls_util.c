@@ -32,7 +32,7 @@ ls_readfile(FILE *fp, char **outdata, uint32_t *outlen)
 		};
 	}
 	
-	char *data = ls_calloc(len, 1);
+	char *data = ls_malloc(len);
 	fseek(fp, 0, SEEK_SET);
 	if (fread(data, 1, len, fp) != (size_t)len)
 	{
@@ -101,7 +101,44 @@ ls_allocbatch(ls_allocbatch_t *allocs, size_t nallocs)
 }
 
 void *
-ls_reallocbatch(ls_allocbatch_t *new, ls_allocbatch_t const *old, size_t n)
+ls_reallocbatch(void *p, ls_reallocbatch_t *reallocs, size_t nreallocs)
 {
-	// TODO: implement ls_reallocbatch().
+	// TODO: there's certainly an optimization / simplification to be found here.
+	
+	size_t *oldoffsets = ls_malloc(nreallocs * sizeof(size_t));
+	size_t *newoffsets = ls_malloc(nreallocs * sizeof(size_t));
+	
+	size_t newsize = 0, oldsize = 0;
+	for (size_t i = 0; i < nreallocs; ++i)
+	{
+		newoffsets[i] = newsize;
+		newsize += reallocs[i].newn * reallocs[i].size;
+		newsize = ls_alignbatch(newsize);
+		
+		oldoffsets[i] = oldsize;
+		oldsize += reallocs[i].oldn * reallocs[i].size;
+		oldsize = ls_alignbatch(oldsize);
+	}
+	
+	uint8_t *ptr = ls_realloc(p, newsize);
+	if (!ptr)
+	{
+		ls_free(newoffsets);
+		ls_free(oldoffsets);
+		return NULL;
+	}
+	
+	for (ssize_t i = nreallocs - 1; i >= 0; --i)
+	{
+		size_t newbytes = reallocs[i].newn * reallocs[i].size;
+		size_t oldbytes = reallocs[i].oldn * reallocs[i].size;
+		size_t bytes = newbytes < oldbytes ? newbytes : oldbytes;
+		
+		ls_memmove(&ptr[newoffsets[i]], &ptr[oldoffsets[i]], bytes);
+		*reallocs[i].ptr = &ptr[newoffsets[i]];
+	}
+	
+	ls_free(newoffsets);
+	ls_free(oldoffsets);
+	return ptr;
 }

@@ -21,5 +21,9 @@
 
 void *(*ls_malloc)(size_t) = malloc;
 void *(*ls_realloc)(void *, size_t) = realloc;
+void *(*ls_calloc)(size_t, size_t) = calloc;
+void *(*ls_reallocarray)(void *, size_t, size_t) = reallocarray;
 void (*ls_free)(void *) = free;
 char *(*ls_strdup)(char const *) = strdup;
+void *(*ls_memcpy)(void *, void const *, size_t) = memcpy;
+void *(*ls_memmove)(void *, void const *, size_t) = memmove;

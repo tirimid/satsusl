@@ -165,6 +165,12 @@ typedef struct ls_allocbatch
 	size_t n, size;
 } ls_allocbatch_t;
 
+typedef struct ls_reallocbatch
+{
+	void **ptr;
+	size_t oldn, newn, size;
+} ls_reallocbatch_t;
+
 typedef struct ls_tok
 {
 	uint32_t pos, len;
@@ -195,6 +201,7 @@ typedef struct ls_ast
 
 typedef struct ls_module
 {
+	void *buf;
 	char **names;
 	uint64_t *ids;
 	char **data;
@@ -206,6 +213,7 @@ typedef struct ls_module
 
 typedef struct ls_symtab
 {
+	void *buf;
 	char **syms;
 	uint8_t *types;
 	uint32_t *mods, *nodes;
@@ -219,8 +227,12 @@ typedef struct ls_symtab
 
 extern void *(*ls_malloc)(size_t);
 extern void *(*ls_realloc)(void *, size_t);
+extern void *(*ls_calloc)(size_t, size_t);
+extern void *(*ls_reallocarray)(void *, size_t, size_t);
 extern void (*ls_free)(void *);
 extern char *(*ls_strdup)(char const *);
+extern void *(*ls_memcpy)(void *, void const *, size_t);
+extern void *(*ls_memmove)(void *, void const *, size_t);
 
 //-------------//
 // data tables //
@@ -241,7 +253,7 @@ ls_err_t ls_readfile(FILE *fp, char **outdata, uint32_t *outlen);
 uint64_t ls_fileid(char const *file, bool deref);
 uint64_t ls_alignbatch(uint64_t n);
 void *ls_allocbatch(ls_allocbatch_t *allocs, size_t nallocs);
-void *ls_reallocbatch(ls_allocbatch_t *new, ls_allocbatch_t const *old, size_t n);
+void *ls_reallocbatch(void *p, ls_reallocbatch_t *reallocs, size_t nreallocs);
 
 // lex.
 ls_err_t ls_lex(ls_lex_t *out, char const *data, uint32_t len);
@@ -271,6 +283,7 @@ int64_t ls_findsym(ls_symtab_t const *st, char const *sym);
 void ls_pushsym(ls_symtab_t *st, char *sym, ls_primtype_t type, uint32_t mod, uint32_t node, uint16_t scope);
 void ls_destroysymtab(ls_symtab_t *st);
 void ls_popsymscope(ls_symtab_t *st, uint16_t scope);
+uint16_t ls_curscope(ls_symtab_t const *st);
 uint16_t ls_newscope(ls_symtab_t const *st);
 
 #endif
