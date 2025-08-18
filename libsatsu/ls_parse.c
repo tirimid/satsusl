@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-typedef struct ls_pstate
+typedef struct ls_parse
 {
 	ls_lex_t const *lex;
 	ls_ast_t *ast;
 	uint32_t cur;
-} ls_pstate_t;
+} ls_parse_t;
 
 typedef struct ls_pratt
 {
@@ -39,7 +39,6 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	// expression nodes.
 	"eatom",
 	"ecall",
-	"eaccess",
 	"eneg",
 	"enot",
 	"emul",
@@ -65,33 +64,32 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	"emodassign"
 };
 
-static ls_toktype_t ls_nexttok(ls_pstate_t *p);
-static ls_err_t ls_requiretok(ls_pstate_t *p, ls_toktype_t *out);
-static ls_err_t ls_expecttok(ls_pstate_t *p, ls_toktype_t type);
-static ls_err_t ls_parseroot(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parseimport(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsefunc(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsedeclaration(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsearglist(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsearg(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsereturn(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsectree(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsewhile(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsefor(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsebreak(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsecontinue(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parseblock(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parsestmt(ls_pstate_t *p, uint32_t *out);
-static ls_err_t ls_parseexpr(ls_pstate_t *p, uint32_t *out, uint8_t const term[], size_t nterm, uint8_t minbp);
-static ls_err_t ls_parseexprnud(ls_pstate_t *p, uint32_t *out, uint8_t const term[], size_t nterm);
-static ls_err_t ls_parseexprled(ls_pstate_t *p, uint32_t *out, uint32_t lhs, uint8_t const term[], size_t nterm);
-static ls_err_t ls_parsetype(ls_pstate_t *p, uint32_t *out);
+static ls_toktype_t ls_nexttok(ls_parse_t *p);
+static ls_err_t ls_requiretok(ls_parse_t *p, ls_toktype_t *out);
+static ls_err_t ls_expecttok(ls_parse_t *p, ls_toktype_t type);
+static ls_err_t ls_parseroot(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parseimport(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsefunc(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsedeclaration(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsearglist(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsearg(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsereturn(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsectree(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsewhile(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsefor(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsebreak(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsecontinue(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parseblock(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parsestmt(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parseexpr(ls_parse_t *p, uint32_t *out, uint8_t const term[], size_t nterm, uint8_t minbp);
+static ls_err_t ls_parseexprnud(ls_parse_t *p, uint32_t *out, uint8_t const term[], size_t nterm);
+static ls_err_t ls_parseexprled(ls_parse_t *p, uint32_t *out, uint32_t lhs, uint8_t const term[], size_t nterm);
+static ls_err_t ls_parsetype(ls_parse_t *p, uint32_t *out);
 
 static ls_pratt_t ls_pratt[LS_TOKTYPE_END] =
 {
 	// left-to-right.
 	[LS_LPAREN] = {0, 0, 19, 20, LS_NULL, LS_ECALL},
-	[LS_PERIOD] = {0, 0, 19, 20, LS_NULL, LS_EACCESS},
 	
 	// right-to-left.
 	[LS_BANG] = {18, 17, 0, 0, LS_ENOT, LS_NULL},
@@ -149,7 +147,7 @@ ls_parse(ls_ast_t *out, ls_lex_t const *l)
 	};
 	a.buf = ls_allocbatch(allocs, ARRSIZE(allocs));
 	
-	ls_pstate_t p =
+	ls_parse_t p =
 	{
 		.lex = l,
 		.ast = &a,
@@ -255,7 +253,7 @@ ls_destroyast(ls_ast_t *a)
 }
 
 static ls_toktype_t
-ls_nexttok(ls_pstate_t *p)
+ls_nexttok(ls_parse_t *p)
 {
 	++p->cur;
 	if (p->cur >= p->lex->ntoks)
@@ -266,7 +264,7 @@ ls_nexttok(ls_pstate_t *p)
 }
 
 static ls_err_t
-ls_requiretok(ls_pstate_t *p, ls_toktype_t *out)
+ls_requiretok(ls_parse_t *p, ls_toktype_t *out)
 {
 	++p->cur;
 	if (p->cur >= p->lex->ntoks)
@@ -285,7 +283,7 @@ ls_requiretok(ls_pstate_t *p, ls_toktype_t *out)
 }
 
 static ls_err_t
-ls_expecttok(ls_pstate_t *p, ls_toktype_t type)
+ls_expecttok(ls_parse_t *p, ls_toktype_t type)
 {
 	++p->cur;
 	if (p->cur >= p->lex->ntoks)
@@ -303,7 +301,7 @@ ls_expecttok(ls_pstate_t *p, ls_toktype_t type)
 	if (p->lex->types[p->cur] != type)
 	{
 		ls_tok_t tok = p->lex->toks[p->cur];
-		char msg[128];
+		char msg[GENMSGLEN];
 		sprintf(msg, "expected %s", ls_toknames[type]);
 		return (ls_err_t)
 		{
@@ -318,7 +316,7 @@ ls_expecttok(ls_pstate_t *p, ls_toktype_t type)
 }
 
 static ls_err_t
-ls_parseroot(ls_pstate_t *p, uint32_t *out)
+ls_parseroot(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t root = ls_addnode(p->ast, LS_ROOT);
 	
@@ -362,7 +360,7 @@ ls_parseroot(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parseimport(ls_pstate_t *p, uint32_t *out)
+ls_parseimport(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t imp = ls_addnode(p->ast, LS_IMPORT);
 	
@@ -385,7 +383,7 @@ ls_parseimport(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsefunc(ls_pstate_t *p, uint32_t *out)
+ls_parsefunc(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t fn = ls_addnode(p->ast, LS_FUNCDECL);
 	
@@ -426,7 +424,7 @@ ls_parsefunc(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsedeclaration(ls_pstate_t *p, uint32_t *out)
+ls_parsedeclaration(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t decl = ls_addnode(p->ast, LS_DECL);
 	
@@ -469,7 +467,7 @@ ls_parsedeclaration(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsearglist(ls_pstate_t *p, uint32_t *out)
+ls_parsearglist(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t arglist = ls_addnode(p->ast, LS_ARGLIST);
 	
@@ -532,7 +530,7 @@ ls_parsearglist(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsearg(ls_pstate_t *p, uint32_t *out)
+ls_parsearg(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t arg = ls_addnode(p->ast, LS_ARG);
 	
@@ -557,7 +555,7 @@ ls_parsearg(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsereturn(ls_pstate_t *p, uint32_t *out)
+ls_parsereturn(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t return_ = ls_addnode(p->ast, LS_RETURN);
 	p->ast->nodes[return_].tok = p->cur;
@@ -585,7 +583,7 @@ ls_parsereturn(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsectree(ls_pstate_t *p, uint32_t *out)
+ls_parsectree(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t ctree = ls_addnode(p->ast, LS_CTREE);
 	p->ast->nodes[ctree].tok = p->cur;
@@ -637,7 +635,7 @@ ls_parsectree(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsewhile(ls_pstate_t *p, uint32_t *out)
+ls_parsewhile(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t while_ = ls_addnode(p->ast, LS_WHILE);
 	p->ast->nodes[while_].tok = p->cur;
@@ -673,7 +671,7 @@ ls_parsewhile(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsefor(ls_pstate_t *p, uint32_t *out)
+ls_parsefor(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t for_ = ls_addnode(p->ast, LS_FOR);
 	p->ast->nodes[for_].tok = p->cur;
@@ -742,7 +740,7 @@ ls_parsefor(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsebreak(ls_pstate_t *p, uint32_t *out)
+ls_parsebreak(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t break_ = ls_addnode(p->ast, LS_BREAK);
 	p->ast->nodes[break_].tok = p->cur;
@@ -758,7 +756,7 @@ ls_parsebreak(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsecontinue(ls_pstate_t *p, uint32_t *out)
+ls_parsecontinue(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t continue_ = ls_addnode(p->ast, LS_CONTINUE);
 	p->ast->nodes[continue_].tok = p->cur;
@@ -774,7 +772,7 @@ ls_parsecontinue(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parseblock(ls_pstate_t *p, uint32_t *out)
+ls_parseblock(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t block = ls_addnode(p->ast, LS_BLOCK);
 	p->ast->nodes[block].tok = p->cur;
@@ -800,7 +798,7 @@ ls_parseblock(ls_pstate_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsestmt(ls_pstate_t *p, uint32_t *out)
+ls_parsestmt(ls_parse_t *p, uint32_t *out)
 {
 	ls_toktype_t type;
 	ls_err_t e = ls_requiretok(p, &type);
@@ -861,7 +859,7 @@ ls_parsestmt(ls_pstate_t *p, uint32_t *out)
 
 static ls_err_t
 ls_parseexpr(
-	ls_pstate_t *p,
+	ls_parse_t *p,
 	uint32_t *out,
 	uint8_t const term[],
 	size_t nterm,
@@ -957,7 +955,7 @@ ls_parseexpr(
 
 static ls_err_t
 ls_parseexprnud(
-	ls_pstate_t *p,
+	ls_parse_t *p,
 	uint32_t *out,
 	uint8_t const term[],
 	size_t nterm
@@ -993,7 +991,7 @@ ls_parseexprnud(
 
 static ls_err_t
 ls_parseexprled(
-	ls_pstate_t *p,
+	ls_parse_t *p,
 	uint32_t *out,
 	uint32_t lhs,
 	uint8_t const term[],
@@ -1063,7 +1061,6 @@ ls_parseexprled(
 		
 		break;
 	}
-	case LS_EACCESS:
 	case LS_EMUL:
 	case LS_EDIV:
 	case LS_EMOD:
@@ -1103,7 +1100,7 @@ ls_parseexprled(
 }
 
 static ls_err_t
-ls_parsetype(ls_pstate_t *p, uint32_t *out)
+ls_parsetype(ls_parse_t *p, uint32_t *out)
 {
 	uint32_t type = ls_addnode(p->ast, LS_TYPE);
 	
@@ -1125,7 +1122,7 @@ ls_parsetype(ls_pstate_t *p, uint32_t *out)
 		{
 			.code = 1,
 			.pos = tok.pos,
-			.len = tok.pos,
+			.len = tok.len,
 			.msg = ls_strdup("expected type")
 		};
 	}

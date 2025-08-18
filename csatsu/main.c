@@ -82,7 +82,18 @@ main(int argc, char *argv[])
 		return 0;
 	}
 	
-	// TODO: add sema stage.
+	e = ls_sema(&mod);
+	if (e.code)
+	{
+		errfile(mod.names[e.src], mod.data[e.src], mod.lens[e.src], e.pos, e.len, "main: semantic analysis failed - %s!", e.msg);
+	}
+	
+	if (a_args.target == A_SEMA)
+	{
+		return 0;
+	}
+	
+	// TODO: add exec stage.
 	
 	return 0;
 }

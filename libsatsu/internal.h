@@ -2,3 +2,5 @@
 
 #define STRINGIFY(s) #s
 #define ARRSIZE(a) (sizeof(a) / sizeof(a[0]))
+
+#define GENMSGLEN 256

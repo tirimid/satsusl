@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
+typedef struct ls_sema
+{
+	ls_module_t const *m;
+	ls_symtab_t *st;
+	uint32_t mod;
+	ls_primtype_t rettype;
+	uint16_t loopdepth;
+	uint16_t scope;
+} ls_sema_t;
+
 char const *ls_primtypenames[LS_PRIMTYPE_END] =
 {
 	"null",
@@ -22,8 +32,89 @@ ls_primtype_t ls_toktoprim[LS_TOKTYPE_END] =
 };
 
 static ls_err_t ls_redefinition(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, ls_tok_t cur, int64_t prev);
-static ls_err_t ls_semafunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st);
-static ls_err_t ls_semastmt(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st);
+static ls_err_t ls_semafuncdecl(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semadecl(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semareturn(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semactree(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semawhile(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semafor(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semabreak(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semacontinue(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semablock(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeatom(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaecall(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeneg(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaenot(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaemul(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaediv(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaemod(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeadd(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaesub(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeless(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaelequal(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaegreater(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaegrequal(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeequal(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaenequal(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeand(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeor(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaexor(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeternary(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeassign(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeaddassign(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaesubassign(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaemulassign(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaedivassign(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaemodassign(ls_sema_t *s, uint32_t node);
+
+static ls_err_t (*ls_semafns[LS_NODETYPE_END])(ls_sema_t *, uint32_t) =
+{
+	// structure nodes.
+	[LS_NULL] = NULL,
+	[LS_ROOT] = NULL,
+	[LS_IMPORT] = NULL,
+	[LS_FUNCDECL] = ls_semafuncdecl,
+	[LS_DECL] = ls_semadecl,
+	[LS_ARGLIST] = NULL,
+	[LS_ARG] = NULL,
+	[LS_RETURN] = ls_semareturn,
+	[LS_CTREE] = ls_semactree,
+	[LS_WHILE] = ls_semawhile,
+	[LS_FOR] = ls_semafor,
+	[LS_BREAK] = ls_semabreak,
+	[LS_CONTINUE] = ls_semacontinue,
+	[LS_BLOCK] = ls_semablock,
+	
+	// type nodes.
+	[LS_TYPE] = NULL,
+	
+	// expression nodes.
+	[LS_EATOM] = ls_semaeatom,
+	[LS_ECALL] = ls_semaecall,
+	[LS_ENEG] = ls_semaeneg,
+	[LS_ENOT] = ls_semaenot,
+	[LS_EMUL] = ls_semaemul,
+	[LS_EDIV] = ls_semaediv,
+	[LS_EMOD] = ls_semaemod,
+	[LS_EADD] = ls_semaeadd,
+	[LS_ESUB] = ls_semaesub,
+	[LS_ELESS] = ls_semaeless,
+	[LS_ELEQUAL] = ls_semaelequal,
+	[LS_EGREATER] = ls_semaegreater,
+	[LS_EGREQUAL] = ls_semaegrequal,
+	[LS_EEQUAL] = ls_semaeequal,
+	[LS_ENEQUAL] = ls_semaenequal,
+	[LS_EAND] = ls_semaeand,
+	[LS_EOR] = ls_semaeor,
+	[LS_EXOR] = ls_semaexor,
+	[LS_ETERNARY] = ls_semaeternary,
+	[LS_EASSIGN] = ls_semaeassign,
+	[LS_EADDASSIGN] = ls_semaeaddassign,
+	[LS_ESUBASSIGN] = ls_semaesubassign,
+	[LS_EMULASSIGN] = ls_semaemulassign,
+	[LS_EDIVASSIGN] = ls_semaedivassign,
+	[LS_EMODASSIGN] = ls_semaemodassign
+};
 
 // *out takes ownership of *a, *l, name[0:strlen(name)], and data[0:len].
 ls_module_t
@@ -148,7 +239,7 @@ ls_resolveimports(ls_module_t *m, char const *paths[], size_t npaths)
 		e = ls_lex(&lex, data, len);
 		if (e.code)
 		{
-			char msg[256];
+			char msg[GENMSGLEN];
 			sprintf(msg, "failed to lex file at %u+%u - %s", e.pos, e.len, e.msg);
 			
 			ls_destroyerr(&e);
@@ -167,7 +258,7 @@ ls_resolveimports(ls_module_t *m, char const *paths[], size_t npaths)
 		e = ls_parse(&ast, &lex);
 		if (e.code)
 		{
-			char msg[256];
+			char msg[GENMSGLEN];
 			sprintf(msg, "failed to parse file at %u+%u - %s", e.pos, e.len, e.msg);
 			
 			ls_destroyerr(&e);
@@ -246,20 +337,14 @@ ls_destroymodule(ls_module_t *m)
 		ls_destroylex(&m->lexes[i]);
 		ls_destroyast(&m->asts[i]);
 	}
-	
-	free(m->names);
-	free(m->ids);
-	free(m->data);
-	free(m->lens);
-	free(m->lexes);
-	free(m->asts);
+	free(m->buf);
 }
 
 ls_err_t
-ls_sema(ls_module_t *m)
+ls_globalsymtab(ls_symtab_t *out, ls_module_t const *m)
 {
-	// set initial null typeinfo and create global symtab.
 	ls_symtab_t st = ls_createsymtab();
+	
 	for (size_t i = 0; i < m->nmods; ++i)
 	{
 		for (size_t j = 0; j < m->asts[i].nnodes; ++j)
@@ -286,17 +371,38 @@ ls_sema(ls_module_t *m)
 		}
 	}
 	
-	// generate typeinfo for functions.
+	*out = st;
+	return (ls_err_t){0};
+}
+
+ls_err_t
+ls_sema(ls_module_t const *m)
+{
+	ls_symtab_t st;
+	ls_err_t e = ls_globalsymtab(&st, m);
+	if (e.code)
+	{
+		return e;
+	}
+	
 	for (size_t i = 0; i < m->nmods; ++i)
 	{
 		for (size_t j = 0; j < m->asts[i].nnodes; ++j)
 		{
-			if (m->asts[i].types[j] != LS_FUNCDECL)
+			ls_err_t (*fn)(ls_sema_t *, uint32_t) = ls_semafns[m->asts[i].types[j]];
+			if (!fn)
 			{
 				continue;
 			}
 			
-			ls_err_t e = ls_semafunc(m, i, j, &st);
+			ls_sema_t s =
+			{
+				.m = m,
+				.st = &st,
+				.mod = i
+			};
+			
+			e = fn(&s, j);
 			if (e.code)
 			{
 				ls_destroysymtab(&st);
@@ -311,15 +417,22 @@ ls_sema(ls_module_t *m)
 ls_symtab_t
 ls_createsymtab(void)
 {
-	return (ls_symtab_t)
+	ls_symtab_t st =
 	{
-		.syms = ls_calloc(1, sizeof(char *)),
-		.types = ls_calloc(1, 1),
-		.mods = ls_calloc(1, sizeof(uint32_t)),
-		.nodes = ls_calloc(1, sizeof(uint32_t)),
-		.scopes = ls_calloc(1, sizeof(uint16_t)),
 		.symcap = 1
 	};
+	
+	ls_allocbatch_t allocs[] =
+	{
+		{(void **)&st.syms, 1, sizeof(char *)},
+		{(void **)&st.types, 1, sizeof(uint8_t)},
+		{(void **)&st.mods, 1, sizeof(uint32_t)},
+		{(void **)&st.nodes, 1, sizeof(uint32_t)},
+		{(void **)&st.scopes, 1, sizeof(uint16_t)}
+	};
+	st.buf = ls_allocbatch(allocs, ARRSIZE(allocs));
+	
+	return st;
 }
 
 int64_t
@@ -347,12 +460,17 @@ ls_pushsym(
 {
 	if (st->nsyms >= st->symcap)
 	{
+		ls_reallocbatch_t reallocs[] =
+		{
+			{(void **)&st->syms, st->symcap, 2 * st->symcap, sizeof(char *)},
+			{(void **)&st->types, st->symcap, 2 * st->symcap, sizeof(uint8_t)},
+			{(void **)&st->mods, st->symcap, 2 * st->symcap, sizeof(uint32_t)},
+			{(void **)&st->nodes, st->symcap, 2 * st->symcap, sizeof(uint32_t)},
+			{(void **)&st->scopes, st->symcap, 2 * st->symcap, sizeof(uint16_t)}
+		};
+		
+		st->buf = ls_reallocbatch(st->buf, reallocs, ARRSIZE(reallocs));
 		st->symcap *= 2;
-		st->syms = ls_reallocarray(st->syms, st->symcap, sizeof(char *));
-		st->types = ls_reallocarray(st->types, st->symcap, 1);
-		st->mods = ls_reallocarray(st->mods, st->symcap, sizeof(uint32_t));
-		st->nodes = ls_reallocarray(st->nodes, st->symcap, sizeof(uint32_t));
-		st->scopes = ls_reallocarray(st->scopes, st->symcap, sizeof(uint16_t));
 	}
 	
 	st->syms[st->nsyms] = sym;
@@ -370,12 +488,7 @@ ls_destroysymtab(ls_symtab_t *st)
 	{
 		ls_free(st->syms[i]);
 	}
-	
-	ls_free(st->syms);
-	ls_free(st->types);
-	ls_free(st->mods);
-	ls_free(st->nodes);
-	ls_free(st->scopes);
+	ls_free(st->buf);
 }
 
 void
@@ -388,16 +501,16 @@ ls_popsymscope(ls_symtab_t *st, uint16_t scope)
 	}
 }
 
-uint16_t
-ls_curscope(ls_symtab_t const *st)
+ls_primtype_t
+ls_typeof(
+	ls_module_t const *m,
+	uint32_t mod,
+	ls_symtab_t const *st,
+	uint32_t node
+)
 {
-	return st->nsyms ? st->scopes[st->nsyms - 1] : 0;
-}
-
-uint16_t
-ls_newscope(ls_symtab_t const *st)
-{
-	return st->nsyms ? st->scopes[st->nsyms - 1] + 1 : 0;
+	// TODO: implement ls_typeof().
+	return LS_NULL;
 }
 
 static ls_err_t
@@ -412,7 +525,7 @@ ls_redefinition(
 	size_t prevmod = st->mods[prev], prevnode = st->nodes[prev];
 	ls_tok_t prevtok = m->lexes[prevmod].toks[m->asts[prevmod].nodes[prevnode].tok];
 	
-	char msg[256];
+	char msg[GENMSGLEN];
 	sprintf(msg, "previously defined at %u+%u in %s", prevtok.pos, prevtok.len, m->names[prevmod]);
 	
 	return (ls_err_t)
@@ -426,68 +539,448 @@ ls_redefinition(
 }
 
 static ls_err_t
-ls_semafunc(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
+ls_semafuncdecl(ls_sema_t *s, uint32_t node)
 {
-	uint16_t scope = ls_newscope(st);
+	++s->scope;
 	
-	ls_lex_t *l = &m->lexes[mod];
-	ls_ast_t *a = &m->asts[mod];
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
 	
+	uint32_t ntype = a->nodes[node].children[0];
 	uint32_t narglist = a->nodes[node].children[1];
 	uint32_t nbody = a->nodes[node].children[2];
 	
 	for (size_t i = 0; i < a->nodes[narglist].nchildren; ++i)
 	{
 		uint32_t narg = a->nodes[narglist].children[i];
-		uint32_t nargtype = a->nodes[narg].children[0];
-		
 		ls_tok_t argtok = l->toks[a->nodes[narg].tok];
+		
+		uint32_t nargtype = a->nodes[narg].children[0];
 		ls_toktype_t argtypetok = l->types[a->nodes[nargtype].tok];
 		
 		char sym[LS_MAXIDENT + 1] = {0};
-		ls_readtokraw(sym, m->data[mod], argtok);
+		ls_readtokraw(sym, s->m->data[s->mod], argtok);
 		
-		int64_t prev = ls_findsym(st, sym);
+		int64_t prev = ls_findsym(s->st, sym);
 		if (prev != -1)
 		{
-			return ls_redefinition(m, mod, st, argtok, prev);
+			return ls_redefinition(s->m, s->mod, s->st, argtok, prev);
 		}
 		
-		ls_primtype_t primtype = ls_toktoprim[l->types[argtypetok]];
+		ls_primtype_t primtype = ls_toktoprim[argtypetok];
 		if (primtype == LS_VOID)
 		{
 			return (ls_err_t)
 			{
 				.code = 1,
-				.src = mod,
+				.src = s->mod,
 				.pos = argtok.pos,
 				.len = argtok.len,
 				.msg = ls_strdup("function arguments cannot be void")
 			};
 		}
 		
-		ls_pushsym(st, ls_strdup(sym), primtype, mod, narg, scope);
+		ls_pushsym(s->st, ls_strdup(sym), primtype, s->mod, narg, s->scope);
 	}
 	
-	ls_err_t e = ls_semastmt(m, mod, nbody, st);
+	ls_toktype_t typetok = l->types[a->nodes[ntype].tok];
+	s->rettype = ls_toktoprim[typetok];
+	
+	ls_err_t e = ls_semafns[a->types[nbody]](s, nbody);
 	if (e.code)
 	{
 		return e;
 	}
 	
-	ls_popsymscope(st, scope);
+	ls_popsymscope(s->st, s->scope--);
 	return (ls_err_t){0};
 }
 
 static ls_err_t
-ls_semastmt(ls_module_t *m, uint32_t mod, uint32_t node, ls_symtab_t *st)
+ls_semadecl(ls_sema_t *s, uint32_t node)
 {
-	(void)m;
-	(void)mod;
-	(void)node;
-	(void)st;
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
 	
-	// TODO: implement ls_semastmt().
+	uint32_t ntype = a->nodes[node].children[0];
+	uint32_t nval = a->nodes[node].children[1];
 	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	ls_toktype_t toktype = l->types[a->nodes[ntype].tok];
+	
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, s->m->data[s->mod], tok);
+	
+	int64_t prev = ls_findsym(s->st, sym);
+	if (prev != -1)
+	{
+		return ls_redefinition(s->m, s->mod, s->st, tok, prev);
+	}
+	
+	ls_primtype_t primtype = ls_toktoprim[toktype];
+	if (primtype == LS_VOID)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("declaration type cannot be void")
+		};
+	}
+	
+	ls_err_t e = ls_semafns[a->types[nval]](s, nval);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_primtype_t valprimtype = ls_typeof(s->m, s->mod, s->st, nval);
+	if (valprimtype != primtype)
+	{
+		char msg[GENMSGLEN];
+		sprintf(msg, "declaration is type %s but value is type %s", ls_primtypenames[primtype], ls_primtypenames[valprimtype]);
+		
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup(msg)
+		};
+	}
+	
+	ls_pushsym(s->st, ls_strdup(sym), primtype, s->mod, node, s->scope);
+	
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semareturn(ls_sema_t *s, uint32_t node)
+{
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	ls_tok_t rettok = l->toks[a->nodes[node].tok];
+	
+	if (s->rettype != LS_VOID && !a->nodes[node].nchildren)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = rettok.pos,
+			.len = rettok.len,
+			.msg = ls_strdup("function returning non-void cannot have empty return")
+		};
+	}
+	
+	if (s->rettype == LS_VOID && a->nodes[node].nchildren)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = rettok.pos,
+			.len = rettok.len,
+			.msg = ls_strdup("function returning void cannot have value return")
+		};
+	}
+	
+	if (s->rettype == LS_VOID)
+	{
+		return (ls_err_t){0};
+	}
+	
+	uint32_t nval = a->nodes[node].children[0];
+	
+	ls_err_t e = ls_semafns[a->types[nval]](s, nval);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_primtype_t primtype = ls_typeof(s->m, s->mod, s->st, nval);
+	if (primtype != s->rettype)
+	{
+		char msg[GENMSGLEN];
+		sprintf(msg, "return with value of type %s in function returning %s", ls_primtypenames[primtype], ls_primtypenames[s->rettype]);
+		
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = rettok.pos,
+			.len = rettok.len,
+			.msg = ls_strdup(msg)
+		};
+	}
+	
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semactree(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semawhile(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semafor(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semabreak(ls_sema_t *s, uint32_t node)
+{
+	if (!s->loopdepth)
+	{
+		ls_lex_t const *l = &s->m->lexes[s->mod];
+		ls_ast_t const *a = &s->m->asts[s->mod];
+		
+		ls_tok_t tok = l->toks[a->nodes[node].tok];
+		
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("break statements cannot appear outside of loops")
+		};
+	}
+	
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semacontinue(ls_sema_t *s, uint32_t node)
+{
+	if (!s->loopdepth)
+	{
+		ls_lex_t const *l = &s->m->lexes[s->mod];
+		ls_ast_t const *a = &s->m->asts[s->mod];
+		
+		ls_tok_t tok = l->toks[a->nodes[node].tok];
+		
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("continue statements cannot appear outside of loops")
+		};
+	}
+	
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semablock(ls_sema_t *s, uint32_t node)
+{
+	++s->scope;
+	
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	for (size_t i = 0; i < a->nodes[node].nchildren; ++i)
+	{
+		uint32_t nstmt = a->nodes[node].children[i];
+		
+		ls_err_t e = ls_semafns[a->types[nstmt]](s, nstmt);
+		if (e.code)
+		{
+			return e;
+		}
+	}
+	
+	ls_popsymscope(s->st, s->scope--);
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeatom(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaecall(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeneg(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaenot(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaemul(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaediv(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaemod(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeadd(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaesub(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeless(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaelequal(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaegreater(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaegrequal(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeequal(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaenequal(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeand(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeor(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaexor(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeternary(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeassign(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeaddassign(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaesubassign(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaemulassign(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaedivassign(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaemodassign(ls_sema_t *s, uint32_t node)
+{
+	(void)s; (void)node;
 	return (ls_err_t){0};
 }

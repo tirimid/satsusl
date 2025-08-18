@@ -2,7 +2,6 @@
 //
 // left-to-right
 // ()      function call
-// .       module access
 //
 // right-to-left
 // -       unary minus

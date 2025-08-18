@@ -59,3 +59,9 @@ start()
 	// value return.
 	return 0;
 }
+
+func void
+nonvaluereturn()
+{
+	return;
+}

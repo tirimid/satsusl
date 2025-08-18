@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 // project headers.
-#include "internalutil.h"
+#include "internal.h"
 #include "satsu.h"
 
 // project source.

@@ -25,11 +25,11 @@ fizzbuzz(int n)
 	
 	if (len(accum) == 0)
 	{
-		console.println("${n}");
+		println("${n}");
 	}
 	else
 	{
-		console.println(accum);
+		println(accum);
 	}
 }
 

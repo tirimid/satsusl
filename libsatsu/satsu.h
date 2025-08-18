@@ -56,7 +56,6 @@ typedef enum ls_toktype
 	LS_SEMICOLON,
 	LS_LPAREN,
 	LS_RPAREN,
-	LS_PERIOD,
 	LS_MINUS,
 	LS_BANG,
 	LS_STAR,
@@ -107,7 +106,6 @@ typedef enum ls_nodetype
 	// expression nodes.
 	LS_EATOM,
 	LS_ECALL,
-	LS_EACCESS,
 	LS_ENEG,
 	LS_ENOT,
 	LS_EMUL,
@@ -277,13 +275,13 @@ ls_err_t ls_resolveimports(ls_module_t *m, char const *paths[], size_t npaths);
 void ls_pushmodule(ls_module_t *m, ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
 void ls_printmodule(FILE *fp, ls_module_t const *m);
 void ls_destroymodule(ls_module_t *m);
-ls_err_t ls_sema(ls_module_t *m);
+ls_err_t ls_globalsymtab(ls_symtab_t *out, ls_module_t const *m);
+ls_err_t ls_sema(ls_module_t const *m);
 ls_symtab_t ls_createsymtab(void);
 int64_t ls_findsym(ls_symtab_t const *st, char const *sym);
 void ls_pushsym(ls_symtab_t *st, char *sym, ls_primtype_t type, uint32_t mod, uint32_t node, uint16_t scope);
 void ls_destroysymtab(ls_symtab_t *st);
 void ls_popsymscope(ls_symtab_t *st, uint16_t scope);
-uint16_t ls_curscope(ls_symtab_t const *st);
-uint16_t ls_newscope(ls_symtab_t const *st);
+ls_primtype_t ls_typeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
 
 #endif
