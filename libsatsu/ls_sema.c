@@ -10,6 +10,13 @@ typedef struct ls_sema
 	uint16_t scope;
 } ls_sema_t;
 
+typedef struct ls_typeof
+{
+	ls_module_t const *m;
+	ls_symtab_t const *st;
+	uint32_t mod;
+} ls_typeof_t;
+
 char const *ls_primtypenames[LS_PRIMTYPE_END] =
 {
 	"null",
@@ -66,6 +73,31 @@ static ls_err_t ls_semaesubassign(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaemulassign(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaedivassign(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaemodassign(ls_sema_t *s, uint32_t node);
+static ls_primtype_t ls_typeofeatom(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofecall(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeneg(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofenot(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofemul(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofediv(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofemod(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeadd(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofesub(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeless(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofelequal(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofegreater(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofegrequal(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeequal(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofenequal(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeand(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeor(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofexor(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeternary(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeassign(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofeaddassign(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofesubassign(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofemulassign(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofedivassign(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofemodassign(ls_typeof_t const *t, uint32_t node);
 
 static ls_err_t (*ls_semafns[LS_NODETYPE_END])(ls_sema_t *, uint32_t) =
 {
@@ -114,6 +146,36 @@ static ls_err_t (*ls_semafns[LS_NODETYPE_END])(ls_sema_t *, uint32_t) =
 	[LS_EMULASSIGN] = ls_semaemulassign,
 	[LS_EDIVASSIGN] = ls_semaedivassign,
 	[LS_EMODASSIGN] = ls_semaemodassign
+};
+
+static ls_primtype_t (*ls_typeoffns[LS_NODETYPE_END])(ls_typeof_t const *, uint32_t) =
+{
+	// expression nodes.
+	[LS_EATOM] = ls_typeofeatom,
+	[LS_ECALL] = ls_typeofecall,
+	[LS_ENEG] = ls_typeofeneg,
+	[LS_ENOT] = ls_typeofenot,
+	[LS_EMUL] = ls_typeofemul,
+	[LS_EDIV] = ls_typeofediv,
+	[LS_EMOD] = ls_typeofemod,
+	[LS_EADD] = ls_typeofeadd,
+	[LS_ESUB] = ls_typeofesub,
+	[LS_ELESS] = ls_typeofeless,
+	[LS_ELEQUAL] = ls_typeofelequal,
+	[LS_EGREATER] = ls_typeofegreater,
+	[LS_EGREQUAL] = ls_typeofegrequal,
+	[LS_EEQUAL] = ls_typeofeequal,
+	[LS_ENEQUAL] = ls_typeofenequal,
+	[LS_EAND] = ls_typeofeand,
+	[LS_EOR] = ls_typeofeor,
+	[LS_EXOR] = ls_typeofexor,
+	[LS_ETERNARY] = ls_typeofeternary,
+	[LS_EASSIGN] = ls_typeofeassign,
+	[LS_EADDASSIGN] = ls_typeofeaddassign,
+	[LS_ESUBASSIGN] = ls_typeofesubassign,
+	[LS_EMULASSIGN] = ls_typeofemulassign,
+	[LS_EDIVASSIGN] = ls_typeofedivassign,
+	[LS_EMODASSIGN] = ls_typeofemodassign
 };
 
 // *out takes ownership of *a, *l, name[0:strlen(name)], and data[0:len].
@@ -389,8 +451,7 @@ ls_sema(ls_module_t const *m)
 	{
 		for (size_t j = 0; j < m->asts[i].nnodes; ++j)
 		{
-			ls_err_t (*fn)(ls_sema_t *, uint32_t) = ls_semafns[m->asts[i].types[j]];
-			if (!fn)
+			if (m->asts[i].types[j] != LS_FUNCDECL)
 			{
 				continue;
 			}
@@ -402,7 +463,7 @@ ls_sema(ls_module_t const *m)
 				.mod = i
 			};
 			
-			e = fn(&s, j);
+			e = ls_semafuncdecl(&s, j);
 			if (e.code)
 			{
 				ls_destroysymtab(&st);
@@ -501,6 +562,8 @@ ls_popsymscope(ls_symtab_t *st, uint16_t scope)
 	}
 }
 
+// ls_typeof() assumes that you are getting the type of a node which has already
+// been semantically analyzed; the function only handles the happy path.
 ls_primtype_t
 ls_typeof(
 	ls_module_t const *m,
@@ -509,8 +572,15 @@ ls_typeof(
 	uint32_t node
 )
 {
-	// TODO: implement ls_typeof().
-	return LS_NULL;
+	ls_typeof_t t =
+	{
+		.m = m,
+		.st = st,
+		.mod = mod
+	};
+	
+	ls_nodetype_t type = m->asts[mod].types[node];
+	return ls_typeoffns[type](&t, node);
 }
 
 static ls_err_t
@@ -592,6 +662,7 @@ ls_semafuncdecl(ls_sema_t *s, uint32_t node)
 		return e;
 	}
 	
+	s->rettype = LS_NULL;
 	ls_popsymscope(s->st, s->scope--);
 	return (ls_err_t){0};
 }
@@ -983,4 +1054,208 @@ ls_semaemodassign(ls_sema_t *s, uint32_t node)
 {
 	(void)s; (void)node;
 	return (ls_err_t){0};
+}
+
+static ls_primtype_t
+ls_typeofeatom(ls_typeof_t const *t, uint32_t node)
+{
+	ls_lex_t const *l = &t->m->lexes[t->mod];
+	ls_ast_t const *a = &t->m->asts[t->mod];
+	
+	ls_primtype_t toktoprim[] =
+	{
+		[LS_LITINT] = LS_INT,
+		[LS_LITREAL] = LS_REAL,
+		[LS_LITSTR] = LS_STRING,
+		[LS_KWTRUE] = LS_BOOL,
+		[LS_KWFALSE] = LS_BOOL,
+		[LS_IDENT] = LS_NULL
+	};
+	
+	ls_toktype_t toktype = l->types[a->nodes[node].tok];
+	if (toktoprim[toktype])
+	{
+		return toktoprim[toktype];
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, t->m->data[t->mod], tok);
+	
+	return t->st->types[ls_findsym(t->st, sym)];
+}
+
+static ls_primtype_t
+ls_typeofecall(ls_typeof_t const *t, uint32_t node)
+{
+	ls_lex_t const *l = &t->m->lexes[t->mod];
+	ls_ast_t const *a = &t->m->asts[t->mod];
+	
+	uint32_t nident = a->nodes[node].children[0];
+	ls_tok_t identtok = l->toks[a->nodes[nident].tok];
+	
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, t->m->data[t->mod], identtok);
+	
+	int64_t decl = ls_findsym(t->st, sym);
+	
+	uint32_t funcmod = t->st->mods[decl];
+	
+	uint32_t nfunc = t->st->nodes[decl];
+	uint32_t nfunctype = t->m->asts[funcmod].nodes[nfunc].children[0];
+	ls_node_t functypenode = t->m->asts[funcmod].nodes[nfunctype];
+	
+	ls_toktype_t functoktype = t->m->lexes[funcmod].types[functypenode.tok];
+	return ls_toktoprim[functoktype];
+}
+
+static ls_primtype_t
+ls_typeofeneg(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofenot(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofemul(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofediv(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofemod(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofeadd(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofesub(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofeless(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofelequal(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofegreater(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofegrequal(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofeequal(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofenequal(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofeand(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofeor(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofexor(ls_typeof_t const *t, uint32_t node)
+{
+	return LS_BOOL;
+}
+
+static ls_primtype_t
+ls_typeofeternary(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofeassign(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofeaddassign(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofesubassign(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofemulassign(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofedivassign(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofemodassign(ls_typeof_t const *t, uint32_t node)
+{
+	// TODO: implement.
+	return LS_NULL;
 }
