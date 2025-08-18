@@ -39,6 +39,7 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	")",
 	"-",
 	"!",
+	"=>",
 	"*",
 	"/",
 	"%",
@@ -150,6 +151,11 @@ ls_lex(ls_lex_t *out, char const *data, uint32_t len)
 		else if (!strncmp(&data[i], "*=", 2))
 		{
 			ls_addtok(&l, LS_STAREQUAL, i, 2);
+			++i;
+		}
+		else if (!strncmp(&data[i], "=>", 2))
+		{
+			ls_addtok(&l, LS_EQUALGREATER, i, 2);
 			++i;
 		}
 		else if (data[i] == '*')

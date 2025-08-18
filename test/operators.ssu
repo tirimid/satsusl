@@ -6,7 +6,9 @@
 // right-to-left
 // -       unary minus
 // !       logical NOT
-// $       environment variable access
+//
+// left-to-right
+// =>      type cast
 //
 // left-to-right
 // *       multiplication

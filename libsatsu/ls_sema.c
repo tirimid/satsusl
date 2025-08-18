@@ -52,6 +52,7 @@ static ls_err_t ls_semaeatom(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaecall(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaeneg(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaenot(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaecast(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaemul(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaediv(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaemod(ls_sema_t *s, uint32_t node);
@@ -77,6 +78,7 @@ static ls_primtype_t ls_typeofeatom(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofecall(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofeneg(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofenot(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofecast(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofemul(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofediv(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofemod(ls_typeof_t const *t, uint32_t node);
@@ -125,6 +127,7 @@ static ls_err_t (*ls_semafns[LS_NODETYPE_END])(ls_sema_t *, uint32_t) =
 	[LS_ECALL] = ls_semaecall,
 	[LS_ENEG] = ls_semaeneg,
 	[LS_ENOT] = ls_semaenot,
+	[LS_ECAST] = ls_semaecast,
 	[LS_EMUL] = ls_semaemul,
 	[LS_EDIV] = ls_semaediv,
 	[LS_EMOD] = ls_semaemod,
@@ -155,6 +158,7 @@ static ls_primtype_t (*ls_typeoffns[LS_NODETYPE_END])(ls_typeof_t const *, uint3
 	[LS_ECALL] = ls_typeofecall,
 	[LS_ENEG] = ls_typeofeneg,
 	[LS_ENOT] = ls_typeofenot,
+	[LS_ECAST] = ls_typeofecast,
 	[LS_EMUL] = ls_typeofemul,
 	[LS_EDIV] = ls_typeofediv,
 	[LS_EMOD] = ls_typeofemod,
@@ -795,6 +799,8 @@ ls_semareturn(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semactree(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -802,14 +808,100 @@ ls_semactree(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semawhile(ls_sema_t *s, uint32_t node)
 {
-	(void)s; (void)node;
+	++s->scope;
+	++s->loopdepth;
+	
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t ncond = a->nodes[node].children[0];
+	uint32_t nbody = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[ncond]](s, ncond);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	if (ls_typeof(s->m, s->mod, s->st, ncond) != LS_BOOL)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("condition must be of type bool")
+		};
+	}
+	
+	e = ls_semafns[a->types[nbody]](s, nbody);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	--s->loopdepth;
+	ls_popsymscope(s->st, s->scope--);
 	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_semafor(ls_sema_t *s, uint32_t node)
 {
-	(void)s; (void)node;
+	++s->scope;
+	++s->loopdepth;
+	
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t ninit = a->nodes[node].children[0];
+	uint32_t ncond = a->nodes[node].children[1];
+	uint32_t ninc = a->nodes[node].children[2];
+	uint32_t nbody = a->nodes[node].children[3];
+	
+	ls_err_t e = ls_semafns[a->types[ninit]](s, ninit);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[ncond]](s, ncond);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	if (ls_typeof(s->m, s->mod, s->st, ncond) != LS_BOOL)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("condition must be of type bool")
+		};
+	}
+	
+	e = ls_semafns[a->types[ninc]](s, ninc);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nbody]](s, nbody);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	--s->loopdepth;
+	ls_popsymscope(s->st, s->scope--);
 	return (ls_err_t){0};
 }
 
@@ -884,6 +976,8 @@ ls_semablock(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeatom(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -891,6 +985,8 @@ ls_semaeatom(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaecall(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -898,6 +994,8 @@ ls_semaecall(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeneg(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -905,6 +1003,17 @@ ls_semaeneg(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaenot(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
+	(void)s; (void)node;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaecast(ls_sema_t *s, uint32_t node)
+{
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -912,6 +1021,8 @@ ls_semaenot(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaemul(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -919,6 +1030,8 @@ ls_semaemul(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaediv(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -926,6 +1039,8 @@ ls_semaediv(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaemod(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -933,6 +1048,8 @@ ls_semaemod(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeadd(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -940,6 +1057,8 @@ ls_semaeadd(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaesub(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -947,6 +1066,8 @@ ls_semaesub(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeless(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -954,6 +1075,8 @@ ls_semaeless(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaelequal(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -961,6 +1084,8 @@ ls_semaelequal(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaegreater(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -968,6 +1093,8 @@ ls_semaegreater(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaegrequal(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -975,6 +1102,8 @@ ls_semaegrequal(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeequal(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -982,6 +1111,8 @@ ls_semaeequal(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaenequal(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -989,6 +1120,8 @@ ls_semaenequal(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeand(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -996,6 +1129,8 @@ ls_semaeand(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeor(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1003,6 +1138,8 @@ ls_semaeor(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaexor(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1010,6 +1147,8 @@ ls_semaexor(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeternary(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1017,6 +1156,8 @@ ls_semaeternary(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeassign(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1024,6 +1165,8 @@ ls_semaeassign(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeaddassign(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1031,6 +1174,8 @@ ls_semaeaddassign(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaesubassign(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1038,6 +1183,8 @@ ls_semaesubassign(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaemulassign(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1045,6 +1192,8 @@ ls_semaemulassign(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaedivassign(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1052,6 +1201,8 @@ ls_semaedivassign(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaemodassign(ls_sema_t *s, uint32_t node)
 {
+	// TODO: implement.
+	
 	(void)s; (void)node;
 	return (ls_err_t){0};
 }
@@ -1114,7 +1265,22 @@ static ls_primtype_t
 ls_typeofeneg(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
+}
+
+static ls_primtype_t
+ls_typeofecast(ls_typeof_t const *t, uint32_t node)
+{
+	ls_lex_t const *l = &t->m->lexes[t->mod];
+	ls_ast_t const *a = &t->m->asts[t->mod];
+	
+	uint32_t ntype = a->nodes[node].children[1];
+	
+	ls_toktype_t typetok = l->types[a->nodes[ntype].tok];
+	
+	return ls_toktoprim[typetok];
 }
 
 static ls_primtype_t
@@ -1127,6 +1293,8 @@ static ls_primtype_t
 ls_typeofemul(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1134,6 +1302,8 @@ static ls_primtype_t
 ls_typeofediv(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1141,6 +1311,8 @@ static ls_primtype_t
 ls_typeofemod(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1148,6 +1320,8 @@ static ls_primtype_t
 ls_typeofeadd(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1215,6 +1389,8 @@ static ls_primtype_t
 ls_typeofeternary(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1222,6 +1398,8 @@ static ls_primtype_t
 ls_typeofeassign(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1229,6 +1407,8 @@ static ls_primtype_t
 ls_typeofeaddassign(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1236,6 +1416,8 @@ static ls_primtype_t
 ls_typeofesubassign(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1243,6 +1425,8 @@ static ls_primtype_t
 ls_typeofemulassign(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1250,6 +1434,8 @@ static ls_primtype_t
 ls_typeofedivassign(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }
 
@@ -1257,5 +1443,7 @@ static ls_primtype_t
 ls_typeofemodassign(ls_typeof_t const *t, uint32_t node)
 {
 	// TODO: implement.
+	
+	(void)t; (void)node;
 	return LS_NULL;
 }

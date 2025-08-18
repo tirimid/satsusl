@@ -41,6 +41,7 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	"ecall",
 	"eneg",
 	"enot",
+	"ecast",
 	"emul",
 	"ediv",
 	"emod",
@@ -89,10 +90,13 @@ static ls_err_t ls_parsetype(ls_parse_t *p, uint32_t *out);
 static ls_pratt_t ls_pratt[LS_TOKTYPE_END] =
 {
 	// left-to-right.
-	[LS_LPAREN] = {0, 0, 19, 20, LS_NULL, LS_ECALL},
+	[LS_LPAREN] = {0, 0, 21, 22, LS_NULL, LS_ECALL},
 	
 	// right-to-left.
-	[LS_BANG] = {18, 17, 0, 0, LS_ENOT, LS_NULL},
+	[LS_BANG] = {20, 19, 0, 0, LS_ENOT, LS_NULL},
+	
+	// left-to-right.
+	[LS_EQUALGREATER] = {0, 0, 17, 18, LS_NULL, LS_ECAST},
 	
 	// left-to-right.
 	[LS_STAR] = {0, 0, 15, 16, LS_NULL, LS_EMUL},
@@ -101,7 +105,7 @@ static ls_pratt_t ls_pratt[LS_TOKTYPE_END] =
 	
 	// left-to-right.
 	[LS_PLUS] = {0, 0, 13, 14, LS_NULL, LS_EADD},
-	[LS_MINUS] = {18, 17, 13, 14, LS_ENEG, LS_ESUB},
+	[LS_MINUS] = {20, 19, 13, 14, LS_ENEG, LS_ESUB},
 	
 	// left-to-right.
 	[LS_LESS] = {0, 0, 11, 12, LS_NULL, LS_ELESS},
@@ -726,6 +730,8 @@ ls_parsefor(ls_parse_t *p, uint32_t *out)
 	}
 	++p->cur;
 	
+	ls_parentnode(p->ast, for_, inc);
+	
 	uint32_t body;
 	e = ls_parsestmt(p, &body);
 	if (e.code)
@@ -1039,6 +1045,18 @@ ls_parseexprled(
 		}
 		
 		break;
+	case LS_ECAST:
+	{
+		uint32_t rhs;
+		e = ls_parsetype(p, &rhs);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_parentnode(p->ast, newlhs, rhs);
+		
+		break;
+	}
 	case LS_ETERNARY:
 	{
 		uint8_t const mhsterm[] = {LS_COLON};
