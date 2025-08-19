@@ -72,7 +72,7 @@ showfile(
 	sprintf(linum, "%u", line);
 	usize linumlen = strlen(linum);
 	
-	fprintf(fp, "%s:\n %u |\x1b[0;36m", name, line);
+	fprintf(fp, "%s:\n %u |", name, line);
 	for (usize i = lbegin; i < lend; ++i)
 	{
 		if (data[i] == '\t')
@@ -85,7 +85,7 @@ showfile(
 		}
 	}
 	
-	fprintf(fp, "\x1b[0m\n ");
+	fprintf(fp, "\n ");
 	for (usize i = 0; i <= linumlen; ++i)
 	{
 		fprintf(fp, " ");

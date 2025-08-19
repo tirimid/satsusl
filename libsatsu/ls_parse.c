@@ -935,7 +935,7 @@ ls_parseexpr(
 		
 		if (!ls_pratt[type].ledtype)
 		{
-			ls_tok_t tok = p->lex->toks[p->cur];
+			ls_tok_t tok = p->lex->toks[p->cur + 1];
 			return (ls_err_t)
 			{
 				.code = 1,

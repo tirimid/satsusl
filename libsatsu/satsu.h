@@ -147,6 +147,12 @@ typedef enum ls_primtype
 	LS_PRIMTYPE_END
 } ls_primtype_t;
 
+typedef enum ls_valuetype
+{
+	LS_LVALUE = 1,
+	LS_RVALUE
+} ls_valuetype_t;
+
 //-----------------//
 // data structures //
 //-----------------//
@@ -285,5 +291,6 @@ void ls_pushsym(ls_symtab_t *st, char *sym, ls_primtype_t type, uint32_t mod, ui
 void ls_destroysymtab(ls_symtab_t *st);
 void ls_popsymscope(ls_symtab_t *st, uint16_t scope);
 ls_primtype_t ls_typeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
+ls_valuetype_t ls_valuetypeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
 
 #endif
