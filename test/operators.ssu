@@ -1,5 +1,8 @@
 // operators are presented in descending precedence.
 //
+// special
+// system  interpreter system access
+//
 // left-to-right
 // ()      function call
 //

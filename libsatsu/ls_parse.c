@@ -38,6 +38,7 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	
 	// expression nodes.
 	"eatom",
+	"esystem",
 	"ecall",
 	"eneg",
 	"enot",
@@ -897,6 +898,33 @@ ls_parseexpr(
 		uint8_t const subterm[] = {LS_RPAREN};
 		e = ls_parseexpr(p, &lhs, subterm, sizeof(subterm), 0);
 		++p->cur;
+		break;
+	}
+	case LS_KWSYSTEM:
+	{
+		uint32_t type;
+		e = ls_parsetype(p, &type);
+		if (e.code)
+		{
+			return e;
+		}
+		
+		// TODO: parse system ident token.
+		
+		e = ls_expecttok(p, LS_LPAREN);
+		if (e.code)
+		{
+			return e;
+		}
+		
+		if (ls_nexttok(p) == LS_RPAREN)
+		{
+			break;
+		}
+		--p->cur;
+		
+		// TODO: implement system parse.
+		
 		break;
 	}
 	default:

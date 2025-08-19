@@ -25,6 +25,7 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	"real",
 	"return",
 	"string",
+	"system",
 	"true",
 	"var",
 	"void",

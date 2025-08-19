@@ -44,6 +44,7 @@ typedef enum ls_toktype
 	LS_KWREAL,
 	LS_KWRETURN,
 	LS_KWSTRING,
+	LS_KWSYSTEM,
 	LS_KWTRUE,
 	LS_KWVAR,
 	LS_KWVOID,
@@ -106,6 +107,7 @@ typedef enum ls_nodetype
 	
 	// expression nodes.
 	LS_EATOM,
+	LS_ESYSTEM,
 	LS_ECALL,
 	LS_ENEG,
 	LS_ENOT,
@@ -292,5 +294,7 @@ void ls_destroysymtab(ls_symtab_t *st);
 void ls_popsymscope(ls_symtab_t *st, uint16_t scope);
 ls_primtype_t ls_typeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
 ls_valuetype_t ls_valuetypeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
+
+// exec.
 
 #endif

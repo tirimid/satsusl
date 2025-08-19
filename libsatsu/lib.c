@@ -14,6 +14,7 @@
 #include "satsu.h"
 
 // project source.
+#include "ls_exec.c"
 #include "ls_lex.c"
 #include "ls_parse.c"
 #include "ls_sema.c"

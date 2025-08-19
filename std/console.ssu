@@ -1,5 +1,56 @@
+// SPDX-License-Identifier: BSD-3-Clause
+
+func void
+print(string msg)
+{
+	system void print(msg);
+}
+
 func void
 println(string msg)
 {
-	// TODO: implement println().
+	system void print(msg + "\n");
+}
+
+func void
+eprint(string msg)
+{
+	system void eprint(msg);
+}
+
+func void
+eprintln(string msg)
+{
+	system void eprint(msg + "\n");
+}
+
+func string
+readln()
+{
+	return system string readln();
+}
+
+func string
+readprompt(string msg)
+{
+	system void print(msg);
+	return system string readln();
+}
+
+func void
+loginfo(string msg)
+{
+	system void eprint("info: " + msg + "\n");
+}
+
+func void
+logwarn(string msg)
+{
+	system void eprint("warn: " + msg + "\n");
+}
+
+func void
+logerr(string msg)
+{
+	system void eprint("err: " + msg + "\n");
 }
