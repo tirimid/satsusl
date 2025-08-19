@@ -717,16 +717,13 @@ ls_semadecl(ls_sema_t *s, uint32_t node)
 	ls_primtype_t valprimtype = ls_typeof(s->m, s->mod, s->st, nval);
 	if (valprimtype != primtype)
 	{
-		char msg[GENMSGLEN];
-		sprintf(msg, "declaration is type %s but value is type %s", ls_primtypenames[primtype], ls_primtypenames[valprimtype]);
-		
 		return (ls_err_t)
 		{
 			.code = 1,
 			.src = s->mod,
 			.pos = tok.pos,
 			.len = tok.len,
-			.msg = ls_strdup(msg)
+			.msg = ls_strdup("declaration type does not match value")
 		};
 	}
 	
@@ -1069,7 +1066,107 @@ ls_semaeatom(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaecall(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nfunc = a->nodes[node].children[0];
+	ls_tok_t functok = l->toks[a->nodes[nfunc].tok];
+	
+	if (a->types[nfunc] != LS_EATOM)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = functok.pos,
+			.len = functok.len,
+			.msg = ls_strdup("expected function atom node")
+		};
+	}
+	
+	if (l->types[a->nodes[nfunc].tok] != LS_IDENT)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = functok.pos,
+			.len = functok.len,
+			.msg = ls_strdup("expected identifier on atom node")
+		};
+	}
+	
+	char funcsym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(funcsym, s->m->data[s->mod], functok);
+	
+	int64_t decl = ls_findsym(s->st, funcsym);
+	if (decl == -1)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = functok.pos,
+			.len = functok.len,
+			.msg = ls_strdup("undeclared function")
+		};
+	}
+	
+	uint32_t declmod = s->st->mods[decl];
+	
+	ls_lex_t const *dl = &s->m->lexes[declmod];
+	ls_ast_t const *da = &s->m->asts[declmod];
+	
+	uint32_t ndecl = s->st->nodes[decl];
+	uint32_t ndeclargs = da->nodes[ndecl].children[1];
+	
+	if (a->nodes[node].nchildren - 1 != da->nodes[ndeclargs].nchildren)
+	{
+		char msg[GENMSGLEN];
+		sprintf(msg, "number of call arguments (%u) does not match declaration (%u)", a->nodes[node].nchildren - 1, da->nodes[ndeclargs].nchildren);
+		
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = functok.pos,
+			.len = functok.len,
+			.msg = ls_strdup(msg)
+		};
+	}
+	
+	for (uint32_t i = 1; i < a->nodes[node].nchildren; ++i)
+	{
+		uint32_t narg = a->nodes[node].children[i];
+		uint32_t ndeclarg = da->nodes[ndeclargs].children[i - 1];
+		
+		ls_err_t e = ls_semafns[a->types[narg]](s, narg);
+		if (e.code)
+		{
+			return e;
+		}
+		
+		uint32_t ndeclargtype = da->nodes[ndeclarg].children[0];
+		ls_toktype_t declargtypetok = dl->types[da->nodes[ndeclargtype].tok];
+		ls_primtype_t declargtype = ls_toktoprim[declargtypetok];
+		
+		ls_primtype_t argtype = ls_typeof(s->m, s->mod, s->st, narg);
+		if (argtype != declargtype)
+		{
+			char msg[GENMSGLEN];
+			sprintf(msg, "argument %u should be of type %s but %s was provided", i, ls_primtypenames[declargtype], ls_primtypenames[argtype]);
+			
+			return (ls_err_t)
+			{
+				.code = 1,
+				.src = s->mod,
+				.pos = functok.pos,
+				.len = functok.len,
+				.msg = ls_strdup(msg)
+			};
+		}
+	}
+	
 	return (ls_err_t){0};
 }
 
@@ -1199,35 +1296,286 @@ ls_semaecast(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeadd(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t primtype = ls_typeof(s->m, s->mod, s->st, nlhs);
+	if (primtype != ls_typeof(s->m, s->mod, s->st, nrhs))
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of + must have the same type")
+		};
+	}
+	
+	if (primtype != LS_INT && primtype != LS_REAL && primtype != LS_STRING)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of + must be of type int, real, or string")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_semaeternary(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nmhs = a->nodes[node].children[1];
+	uint32_t nrhs = a->nodes[node].children[2];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nmhs]](s, nmhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	if (ls_typeof(s->m, s->mod, s->st, nlhs) != LS_BOOL)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("condition must be of type bool")
+		};
+	}
+	
+	ls_primtype_t mhstype = ls_typeof(s->m, s->mod, s->st, nmhs);
+	if (mhstype != ls_typeof(s->m, s->mod, s->st, nrhs))
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("true and false values of ternary conditional must have same type")
+		};
+	}
+	
+	if (mhstype == LS_VOID)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("value of ternary conditional cannot be void")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_semaeassign(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t primtype = ls_typeof(s->m, s->mod, s->st, nlhs);
+	if (primtype != ls_typeof(s->m, s->mod, s->st, nrhs))
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of = must have the same type")
+		};
+	}
+	
+	if (ls_valuetypeof(s->m, s->mod, s->st, nlhs) != LS_LVALUE)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("left operand of = must be an lvalue")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_semaeaddassign(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t primtype = ls_typeof(s->m, s->mod, s->st, nlhs);
+	if (primtype != ls_typeof(s->m, s->mod, s->st, nrhs))
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of += must have the same type")
+		};
+	}
+	
+	if (primtype != LS_INT && primtype != LS_REAL && primtype != LS_STRING)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of += must be int, real, or string")
+		};
+	}
+	
+	if (ls_valuetypeof(s->m, s->mod, s->st, nlhs) != LS_LVALUE)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("left operand of += must be an lvalue")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_semarelational(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t lhstype = ls_typeof(s->m, s->mod, s->st, nlhs);
+	if (lhstype != ls_typeof(s->m, s->mod, s->st, nrhs))
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("cannot compare values of different types")
+		};
+	}
+	
+	if (lhstype != LS_INT && lhstype != LS_REAL && lhstype != LS_STRING)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("only values of types int, real, and string can be compared")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
@@ -1273,14 +1621,114 @@ ls_semalogical(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaarithmetic(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t primtype = ls_typeof(s->m, s->mod, s->st, nlhs);
+	if (primtype != ls_typeof(s->m, s->mod, s->st, nrhs))
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of arithmetic operators must have the same type")
+		};
+	}
+	
+	if (primtype != LS_INT && primtype != LS_REAL)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of arithmetic operators must be int or real")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
 static ls_err_t
 ls_semaarithmeticassign(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t primtype = ls_typeof(s->m, s->mod, s->st, nlhs);
+	if (primtype != ls_typeof(s->m, s->mod, s->st, nrhs))
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of arithmetic assignment operators must have the same type")
+		};
+	}
+	
+	if (primtype != LS_INT && primtype != LS_REAL)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operands of arithmetic assignment operators must be int or real")
+		};
+	}
+	
+	if (ls_valuetypeof(s->m, s->mod, s->st, nlhs) != LS_LVALUE)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("left operand of an arithmetic assignment operator must be an lvalue")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
@@ -1321,8 +1769,8 @@ ls_typeofecall(ls_typeof_t const *t, uint32_t node)
 	ls_ast_t const *a = &t->m->asts[t->mod];
 	
 	uint32_t nident = a->nodes[node].children[0];
-	ls_tok_t identtok = l->toks[a->nodes[nident].tok];
 	
+	ls_tok_t identtok = l->toks[a->nodes[nident].tok];
 	char sym[LS_MAXIDENT + 1] = {0};
 	ls_readtokraw(sym, t->m->data[t->mod], identtok);
 	

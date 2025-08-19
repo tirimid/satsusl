@@ -20,7 +20,10 @@ a_proc(i32 argc, char *argv[])
 			{
 				err("args: cannot have more than " STRINGIFY(A_MAXPATHS) " module paths!");
 			}
-			// TODO: verify that optarg is non-empty.
+			if (!strlen(optarg))
+			{
+				err("args: empty module path - %s!", optarg);
+			}
 			a_args.paths[a_args.npaths++] = optarg;
 			break;
 		case 't':
