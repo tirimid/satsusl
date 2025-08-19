@@ -802,9 +802,55 @@ ls_semareturn(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semactree(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	// scope is handled per-branch.
 	
-	(void)s; (void)node;
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t ncond = a->nodes[node].children[0];
+	uint32_t ntruebranch = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[ncond]](s, ncond);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	if (ls_typeof(s->m, s->mod, s->st, ncond) != LS_BOOL)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("condition must be of type bool")
+		};
+	}
+	
+	++s->scope;
+	e = ls_semafns[a->types[ntruebranch]](s, ntruebranch);
+	if (e.code)
+	{
+		return e;
+	}
+	ls_popsymscope(s->st, s->scope--);
+	
+	if (a->nodes[node].nchildren == 3)
+	{
+		uint32_t nfalsebranch = a->nodes[node].children[2];
+		
+		++s->scope;
+		e = ls_semafns[a->types[nfalsebranch]](s, nfalsebranch);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_popsymscope(s->st, s->scope--);
+	}
+	
 	return (ls_err_t){0};
 }
 
@@ -1030,7 +1076,32 @@ ls_semaecall(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaeneg(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nopnd = a->nodes[node].children[0];
+	
+	ls_err_t e = ls_semafns[a->types[nopnd]](s, nopnd);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t primtype = ls_typeof(s->m, s->mod, s->st, nopnd);
+	if (primtype != LS_INT && primtype != LS_REAL)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("the operand of an arithmetic negation must be of type int or real")
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
@@ -1058,7 +1129,7 @@ ls_semaenot(ls_sema_t *s, uint32_t node)
 			.src = s->mod,
 			.pos = tok.pos,
 			.len = tok.len,
-			.msg = ls_strdup("the operand of a logical NOT must be of type bool")
+			.msg = ls_strdup("the operand of a logical negation must be of type bool")
 		};
 	}
 	
@@ -1068,7 +1139,60 @@ ls_semaenot(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaecast(ls_sema_t *s, uint32_t node)
 {
-	// TODO: implement.
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	ls_primtype_t srctype = ls_typeof(s->m, s->mod, s->st, nlhs);
+	ls_primtype_t targettype = ls_typeof(s->m, s->mod, s->st, node);
+	
+	uint8_t legalcasts[][2] =
+	{
+		{LS_INT, LS_REAL},
+		{LS_INT, LS_STRING},
+		{LS_INT, LS_BOOL},
+		{LS_REAL, LS_INT},
+		{LS_REAL, LS_STRING},
+		{LS_STRING, LS_INT},
+		{LS_STRING, LS_REAL},
+		{LS_BOOL, LS_INT},
+		{LS_BOOL, LS_STRING}
+	};
+	
+	bool legal = false;
+	for (size_t i = 0; i < sizeof(legalcasts) / sizeof(legalcasts[0]); ++i)
+	{
+		if (srctype == legalcasts[i][0] && targettype == legalcasts[i][1])
+		{
+			legal = true;
+			break;
+		}
+	}
+	
+	if (!legal)
+	{
+		char msg[GENMSGLEN];
+		sprintf(msg, "cannot cast %s to %s", ls_primtypenames[srctype], ls_primtypenames[targettype]);
+		
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup(msg)
+		};
+	}
+	
 	return (ls_err_t){0};
 }
 
