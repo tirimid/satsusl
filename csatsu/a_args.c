@@ -82,7 +82,14 @@ a_usage(char const *name)
 		"Options:\n"
 		"\t-h        Display help information\n"
 		"\t-m dir    Register import path\n"
-		"\t-t stage  Terminate execution at an early stage\n",
+		"\t-t stage  Terminate execution at an early stage\n"
+		"\n"
+		"Legal stages:\n"
+		"\texec      Run the file (default)\n"
+		"\tlex       Dump file tokens\n"
+		"\tparse     Dump file AST\n"
+		"\timport    Dump ASTs of file and all imports\n"
+		"\tsema      Semantically analyze file\n",
 		name
 	);
 }

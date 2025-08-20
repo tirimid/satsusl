@@ -902,14 +902,23 @@ ls_parseexpr(
 	}
 	case LS_KWSYSTEM:
 	{
-		uint32_t type;
-		e = ls_parsetype(p, &type);
+		lhs = ls_addnode(p->ast, LS_ESYSTEM);
+		
+		uint32_t typenode;
+		e = ls_parsetype(p, &typenode);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_parentnode(p->ast, lhs, typenode);
+		
+		e = ls_expecttok(p, LS_IDENT);
 		if (e.code)
 		{
 			return e;
 		}
 		
-		// TODO: parse system ident token.
+		p->ast->nodes[lhs].tok = p->cur;
 		
 		e = ls_expecttok(p, LS_LPAREN);
 		if (e.code)
@@ -923,7 +932,24 @@ ls_parseexpr(
 		}
 		--p->cur;
 		
-		// TODO: implement system parse.
+		for (;;)
+		{
+			uint8_t const argterm[] = {LS_COMMA, LS_RPAREN};
+			uint32_t arg;
+			e = ls_parseexpr(p, &arg, argterm, sizeof(argterm), 0);
+			if (e.code)
+			{
+				return e;
+			}
+			
+			ls_parentnode(p->ast, lhs, arg);
+			
+			ls_toktype_t endtype = ls_nexttok(p);
+			if (endtype == LS_RPAREN)
+			{
+				break;
+			}
+		}
 		
 		break;
 	}

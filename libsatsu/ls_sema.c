@@ -49,6 +49,7 @@ static ls_err_t ls_semabreak(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semacontinue(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semablock(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaeatom(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaesystem(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaecall(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaeneg(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaenot(ls_sema_t *s, uint32_t node);
@@ -62,6 +63,7 @@ static ls_err_t ls_semalogical(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaarithmetic(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaarithmeticassign(ls_sema_t *s, uint32_t node);
 static ls_primtype_t ls_typeofeatom(ls_typeof_t const *t, uint32_t node);
+static ls_primtype_t ls_typeofesystem(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofecall(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofecast(ls_typeof_t const *t, uint32_t node);
 static ls_primtype_t ls_typeofeternary(ls_typeof_t const *t, uint32_t node);
@@ -92,6 +94,7 @@ static ls_err_t (*ls_semafns[LS_NODETYPE_END])(ls_sema_t *, uint32_t) =
 	
 	// expression nodes.
 	[LS_EATOM] = ls_semaeatom,
+	[LS_ESYSTEM] = ls_semaesystem,
 	[LS_ECALL] = ls_semaecall,
 	[LS_ENEG] = ls_semaeneg,
 	[LS_ENOT] = ls_semaenot,
@@ -123,6 +126,7 @@ static ls_primtype_t (*ls_typeoffns[LS_NODETYPE_END])(ls_typeof_t const *, uint3
 {
 	// expression nodes.
 	[LS_EATOM] = ls_typeofeatom,
+	[LS_ESYSTEM] = ls_typeofesystem,
 	[LS_ECALL] = ls_typeofecall,
 	[LS_ENEG] = ls_typeofpropagating,
 	[LS_ENOT] = ls_typeoflogical,
@@ -1064,6 +1068,25 @@ ls_semaeatom(ls_sema_t *s, uint32_t node)
 }
 
 static ls_err_t
+ls_semaesystem(ls_sema_t *s, uint32_t node)
+{
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	for (uint32_t i = 1; i < a->nodes[node].nchildren; ++i)
+	{
+		uint32_t narg = a->nodes[node].children[i];
+		
+		ls_err_t e = ls_semafns[a->types[narg]](s, narg);
+		if (e.code)
+		{
+			return e;
+		}
+	}
+	
+	return (ls_err_t){0};
+}
+
+static ls_err_t
 ls_semaecall(ls_sema_t *s, uint32_t node)
 {
 	ls_lex_t const *l = &s->m->lexes[s->mod];
@@ -1760,6 +1783,20 @@ ls_typeofeatom(ls_typeof_t const *t, uint32_t node)
 	ls_readtokraw(sym, t->m->data[t->mod], tok);
 	
 	return t->st->types[ls_findsym(t->st, sym)];
+}
+
+static ls_primtype_t
+ls_typeofesystem(ls_typeof_t const *t, uint32_t node)
+{
+	ls_lex_t const *l = &t->m->lexes[t->mod];
+	ls_ast_t const *a = &t->m->asts[t->mod];
+	
+	uint32_t ntype = a->nodes[node].children[0];
+	
+	ls_toktype_t typetok = l->types[a->nodes[ntype].tok];
+	ls_primtype_t primtype = ls_toktoprim[typetok];
+	
+	return primtype;
 }
 
 static ls_primtype_t

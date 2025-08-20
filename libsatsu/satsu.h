@@ -188,7 +188,7 @@ typedef struct ls_lex
 {
 	void *buf;
 	ls_tok_t *toks;
-	uint8_t *types;
+	uint8_t *types; // ls_toktype_t.
 	uint32_t ntoks, tokcap;
 } ls_lex_t;
 
@@ -203,7 +203,7 @@ typedef struct ls_ast
 {
 	void *buf;
 	ls_node_t *nodes;
-	uint8_t *types;
+	uint8_t *types; // ls_nodetype_t.
 	uint32_t nnodes, nodecap;
 } ls_ast_t;
 
@@ -223,11 +223,31 @@ typedef struct ls_symtab
 {
 	void *buf;
 	char **syms;
-	uint8_t *types;
+	uint8_t *types; // ls_primtype_t.
 	uint32_t *mods, *nodes;
 	uint16_t *scopes;
 	uint32_t nsyms, symcap;
 } ls_symtab_t;
+
+typedef struct ls_val
+{
+	union
+	{
+		int64_t int_;
+		double real;
+		struct
+		{
+			char *s;
+			uint32_t len;
+		} string;
+		bool bool_;
+	} data;
+	uint8_t type; // ls_primtype_t.
+} ls_val_t;
+
+typedef struct ls_system
+{
+} ls_system_t;
 
 //-----------------------//
 // library configuration //
@@ -296,5 +316,7 @@ ls_primtype_t ls_typeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *s
 ls_valuetype_t ls_valuetypeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
 
 // exec.
+void ls_destroyval(ls_val_t *v);
+ls_val_t ls_exec(ls_module_t const *m);
 
 #endif
