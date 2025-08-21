@@ -3,54 +3,54 @@
 func void
 std_print(string msg)
 {
-	system void print(msg);
+	system void print(1, msg);
 }
 
 func void
 std_println(string msg)
 {
-	system void print(msg + "\n");
+	system void print(1, msg + "\n");
 }
 
 func void
 std_eprint(string msg)
 {
-	system void eprint(msg);
+	system void print(2, msg);
 }
 
 func void
 std_eprintln(string msg)
 {
-	system void eprint(msg + "\n");
+	system void print(2, msg + "\n");
 }
 
 func string
 std_readln()
 {
-	return system string readln();
+	return system string readln(0);
 }
 
 func string
 std_readprompt(string msg)
 {
-	system void print(msg);
-	return system string readln();
+	system void print(1, msg);
+	return system string readln(0);
 }
 
 func void
 std_loginfo(string msg)
 {
-	system void eprint("info: " + msg + "\n");
+	system void print(2, "info: " + msg + "\n");
 }
 
 func void
 std_logwarn(string msg)
 {
-	system void eprint("warn: " + msg + "\n");
+	system void print(2, "warn: " + msg + "\n");
 }
 
 func void
 std_logerr(string msg)
 {
-	system void eprint("err: " + msg + "\n");
+	system void print(2, "err: " + msg + "\n");
 }

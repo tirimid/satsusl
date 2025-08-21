@@ -95,8 +95,7 @@ main(int argc, char *argv[])
 	
 	ls_sysfns_t sysfns = ls_basesysfns();
 	
-	ls_val_t rc;
-	e = ls_exec(&rc, &mod, stderr, &sysfns, "start");
+	e = ls_exec(&mod, stderr, &sysfns, "start");
 	if (e.code)
 	{
 		err("main: execution failed - %s!", e.msg);

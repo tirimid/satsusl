@@ -75,6 +75,15 @@ showfile(
 	fprintf(fp, "%s:\n %u |", name, line);
 	for (usize i = lbegin; i < lend; ++i)
 	{
+		if (i == pos)
+		{
+			fprintf(fp, "\x1b[1;35m");
+		}
+		else if (i == pos + len)
+		{
+			fprintf(fp, "\x1b[0m");
+		}
+		
 		if (data[i] == '\t')
 		{
 			fprintf(fp, "  ");
