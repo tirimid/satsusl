@@ -16,6 +16,7 @@
 #define LS_NULL 0
 #define LS_MAXIDENT 63
 #define LS_BATCHALIGN 16
+#define LS_MAXSYSARGS 6
 
 //--------------------//
 // enumeration values //
@@ -57,6 +58,8 @@ typedef enum ls_toktype
 	LS_SEMICOLON,
 	LS_LPAREN,
 	LS_RPAREN,
+	LS_LBRACKET,
+	LS_RBRACKET,
 	LS_MINUS,
 	LS_BANG,
 	LS_EQUALGREATER,
@@ -91,7 +94,8 @@ typedef enum ls_nodetype
 	LS_ROOT = 1,
 	LS_IMPORT,
 	LS_FUNCDECL,
-	LS_DECL,
+	LS_GLOBALDECL,
+	LS_LOCALDECL,
 	LS_ARGLIST,
 	LS_ARG,
 	LS_RETURN,
@@ -109,6 +113,7 @@ typedef enum ls_nodetype
 	LS_EATOM,
 	LS_ESYSTEM,
 	LS_ECALL,
+	LS_EACCESS,
 	LS_ENEG,
 	LS_ENOT,
 	LS_ECAST,
@@ -219,16 +224,6 @@ typedef struct ls_module
 	uint32_t nmods, modcap;
 } ls_module_t;
 
-typedef struct ls_symtab
-{
-	void *buf;
-	char **syms;
-	uint8_t *types; // ls_primtype_t.
-	uint32_t *mods, *nodes;
-	uint16_t *scopes;
-	uint32_t nsyms, symcap;
-} ls_symtab_t;
-
 typedef struct ls_val
 {
 	union
@@ -245,9 +240,27 @@ typedef struct ls_val
 	uint8_t type; // ls_primtype_t.
 } ls_val_t;
 
-typedef struct ls_system
+typedef struct ls_symtab
 {
-} ls_system_t;
+	void *buf;
+	char **syms;
+	uint8_t *types; // ls_primtype_t.
+	uint32_t *mods, *nodes;
+	uint16_t *scopes;
+	ls_val_t *vals;
+	uint32_t nsyms, symcap;
+} ls_symtab_t;
+
+typedef struct ls_sysfns
+{
+	void *buf;
+	char **names;
+	ls_val_t (**callbacks)(ls_val_t[LS_MAXSYSARGS]);
+	uint8_t *rettypes; // ls_primtype_t.
+	uint8_t (*argtypes)[LS_MAXSYSARGS]; // ls_primtype_t.
+	uint8_t *nargs;
+	uint32_t nfns, fncap;
+} ls_sysfns_t;
 
 //-----------------------//
 // library configuration //
@@ -317,6 +330,11 @@ ls_valuetype_t ls_valuetypeof(ls_module_t const *m, uint32_t mod, ls_symtab_t co
 
 // exec.
 void ls_destroyval(ls_val_t *v);
-ls_val_t ls_exec(ls_module_t const *m);
+ls_sysfns_t ls_emptysysfns(void);
+ls_sysfns_t ls_basesysfns(void);
+void ls_destroysysfns(ls_sysfns_t *sf);
+int64_t ls_findsysfn(ls_sysfns_t const *sf, char const *sysfn);
+void ls_pushsysfn(ls_sysfns_t *sf, char *name, ls_val_t (*callback)(ls_val_t[LS_MAXSYSARGS]), ls_primtype_t rettype, ls_primtype_t argtypes[LS_MAXSYSARGS], uint8_t nargs);
+ls_err_t ls_exec(ls_val_t *out, ls_module_t const *m, FILE *logfp, ls_sysfns_t const *sf, char const *entry);
 
 #endif

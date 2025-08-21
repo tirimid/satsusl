@@ -1,11 +1,15 @@
 // module inclusion.
-import console;
+import std_console;
+import std_shell;
+
+// global variable declaration.
+var int thing;
 
 // function declaration.
 func int
 start()
 {
-	// variable declaration.
+	// local variable declaration.
 	var int n = 100;
 	
 	// expression statement.

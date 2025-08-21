@@ -22,7 +22,8 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	"root",
 	"import",
 	"funcdecl",
-	"decl",
+	"globaldecl",
+	"localdecl",
 	"arglist",
 	"arg",
 	"return",
@@ -40,6 +41,7 @@ char const *ls_nodenames[LS_NODETYPE_END] =
 	"eatom",
 	"esystem",
 	"ecall",
+	"eaccess",
 	"eneg",
 	"enot",
 	"ecast",
@@ -72,7 +74,8 @@ static ls_err_t ls_expecttok(ls_parse_t *p, ls_toktype_t type);
 static ls_err_t ls_parseroot(ls_parse_t *p, uint32_t *out);
 static ls_err_t ls_parseimport(ls_parse_t *p, uint32_t *out);
 static ls_err_t ls_parsefunc(ls_parse_t *p, uint32_t *out);
-static ls_err_t ls_parsedeclaration(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parseglobaldeclaration(ls_parse_t *p, uint32_t *out);
+static ls_err_t ls_parselocaldeclaration(ls_parse_t *p, uint32_t *out);
 static ls_err_t ls_parsearglist(ls_parse_t *p, uint32_t *out);
 static ls_err_t ls_parsearg(ls_parse_t *p, uint32_t *out);
 static ls_err_t ls_parsereturn(ls_parse_t *p, uint32_t *out);
@@ -92,6 +95,7 @@ static ls_pratt_t ls_pratt[LS_TOKTYPE_END] =
 {
 	// left-to-right.
 	[LS_LPAREN] = {0, 0, 21, 22, LS_NULL, LS_ECALL},
+	[LS_LBRACKET] = {0, 0, 21, 22, LS_NULL, LS_EACCESS},
 	
 	// right-to-left.
 	[LS_BANG] = {20, 19, 0, 0, LS_ENOT, LS_NULL},
@@ -347,6 +351,16 @@ ls_parseroot(ls_parse_t *p, uint32_t *out)
 			}
 			ls_parentnode(p->ast, root, fn);
 		}
+		else if (type == LS_KWVAR)
+		{
+			uint32_t decl;
+			ls_err_t e = ls_parseglobaldeclaration(p, &decl);
+			if (e.code)
+			{
+				return e;
+			}
+			ls_parentnode(p->ast, root, decl);
+		}
 		else
 		{
 			ls_tok_t tok = p->lex->toks[p->cur];
@@ -429,9 +443,41 @@ ls_parsefunc(ls_parse_t *p, uint32_t *out)
 }
 
 static ls_err_t
-ls_parsedeclaration(ls_parse_t *p, uint32_t *out)
+ls_parseglobaldeclaration(ls_parse_t *p, uint32_t *out)
 {
-	uint32_t decl = ls_addnode(p->ast, LS_DECL);
+	uint32_t decl = ls_addnode(p->ast, LS_GLOBALDECL);
+	
+	uint32_t type;
+	ls_err_t e = ls_parsetype(p, &type);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_parentnode(p->ast, decl, type);
+	
+	e = ls_expecttok(p, LS_IDENT);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	p->ast->nodes[decl].tok = p->cur;
+	
+	e = ls_expecttok(p, LS_SEMICOLON);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	*out = decl;
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_parselocaldeclaration(ls_parse_t *p, uint32_t *out)
+{
+	uint32_t decl = ls_addnode(p->ast, LS_LOCALDECL);
 	
 	uint32_t type;
 	ls_err_t e = ls_parsetype(p, &type);
@@ -458,7 +504,7 @@ ls_parsedeclaration(ls_parse_t *p, uint32_t *out)
 	
 	uint8_t const term[] = {LS_SEMICOLON};
 	uint32_t val;
-	e = ls_parseexpr(p, &val, term, sizeof(term), 0);
+	e = ls_parseexpr(p, &val, term, ARRSIZE(term), 0);
 	if (e.code)
 	{
 		return e;
@@ -574,7 +620,7 @@ ls_parsereturn(ls_parse_t *p, uint32_t *out)
 	
 	uint8_t const term[] = {LS_SEMICOLON};
 	uint32_t val;
-	ls_err_t e = ls_parseexpr(p, &val, term, sizeof(term), 0);
+	ls_err_t e = ls_parseexpr(p, &val, term, ARRSIZE(term), 0);
 	if (e.code)
 	{
 		return e;
@@ -601,7 +647,7 @@ ls_parsectree(ls_parse_t *p, uint32_t *out)
 	
 	uint8_t const term[] = {LS_RPAREN};
 	uint32_t cond;
-	e = ls_parseexpr(p, &cond, term, sizeof(term), 0);
+	e = ls_parseexpr(p, &cond, term, ARRSIZE(term), 0);
 	if (e.code)
 	{
 		return e;
@@ -653,7 +699,7 @@ ls_parsewhile(ls_parse_t *p, uint32_t *out)
 	
 	uint8_t const term[] = {LS_RPAREN};
 	uint32_t cond;
-	e = ls_parseexpr(p, &cond, term, sizeof(term), 0);
+	e = ls_parseexpr(p, &cond, term, ARRSIZE(term), 0);
 	if (e.code)
 	{
 		return e;
@@ -690,7 +736,7 @@ ls_parsefor(ls_parse_t *p, uint32_t *out)
 	if (ls_nexttok(p) == LS_KWVAR)
 	{
 		uint32_t init;
-		e = ls_parsedeclaration(p, &init);
+		e = ls_parselocaldeclaration(p, &init);
 		if (e.code)
 		{
 			return e;
@@ -702,7 +748,7 @@ ls_parsefor(ls_parse_t *p, uint32_t *out)
 		--p->cur;
 		uint8_t const initterm[] = {LS_SEMICOLON};
 		uint32_t init;
-		e = ls_parseexpr(p, &init, initterm, sizeof(initterm), 0);
+		e = ls_parseexpr(p, &init, initterm, ARRSIZE(initterm), 0);
 		if (e.code)
 		{
 			return e;
@@ -713,7 +759,7 @@ ls_parsefor(ls_parse_t *p, uint32_t *out)
 	
 	uint8_t const condterm[] = {LS_SEMICOLON};
 	uint32_t cond;
-	e = ls_parseexpr(p, &cond, condterm, sizeof(condterm), 0);
+	e = ls_parseexpr(p, &cond, condterm, ARRSIZE(condterm), 0);
 	if (e.code)
 	{
 		return e;
@@ -724,7 +770,7 @@ ls_parsefor(ls_parse_t *p, uint32_t *out)
 	
 	uint8_t const incterm[] = {LS_RPAREN};
 	uint32_t inc;
-	e = ls_parseexpr(p, &inc, incterm, sizeof(incterm), 0);
+	e = ls_parseexpr(p, &inc, incterm, ARRSIZE(incterm), 0);
 	if (e.code)
 	{
 		return e;
@@ -817,7 +863,7 @@ ls_parsestmt(ls_parse_t *p, uint32_t *out)
 	uint32_t stmt;
 	if (type == LS_KWVAR)
 	{
-		e = ls_parsedeclaration(p, &stmt);
+		e = ls_parselocaldeclaration(p, &stmt);
 	}
 	else if (type == LS_LBRACE)
 	{
@@ -851,7 +897,7 @@ ls_parsestmt(ls_parse_t *p, uint32_t *out)
 	{
 		--p->cur;
 		uint8_t const term[] = {LS_SEMICOLON};
-		e = ls_parseexpr(p, &stmt, term, sizeof(term), 0);
+		e = ls_parseexpr(p, &stmt, term, ARRSIZE(term), 0);
 		++p->cur;
 	}
 	
@@ -896,7 +942,7 @@ ls_parseexpr(
 	case LS_LPAREN:
 	{
 		uint8_t const subterm[] = {LS_RPAREN};
-		e = ls_parseexpr(p, &lhs, subterm, sizeof(subterm), 0);
+		e = ls_parseexpr(p, &lhs, subterm, ARRSIZE(subterm), 0);
 		++p->cur;
 		break;
 	}
@@ -936,7 +982,7 @@ ls_parseexpr(
 		{
 			uint8_t const argterm[] = {LS_COMMA, LS_RPAREN};
 			uint32_t arg;
-			e = ls_parseexpr(p, &arg, argterm, sizeof(argterm), 0);
+			e = ls_parseexpr(p, &arg, argterm, ARRSIZE(argterm), 0);
 			if (e.code)
 			{
 				return e;
@@ -1083,7 +1129,7 @@ ls_parseexprled(
 		{
 			uint8_t const argterm[] = {LS_COMMA, LS_RPAREN};
 			uint32_t arg;
-			e = ls_parseexpr(p, &arg, argterm, sizeof(argterm), 0);
+			e = ls_parseexpr(p, &arg, argterm, ARRSIZE(argterm), 0);
 			if (e.code)
 			{
 				return e;
@@ -1099,6 +1145,19 @@ ls_parseexprled(
 		}
 		
 		break;
+	case LS_EACCESS:
+	{
+		uint8_t const rhsterm[] = {LS_RBRACKET};
+		uint32_t rhs;
+		e = ls_parseexpr(p, &rhs, rhsterm, ARRSIZE(rhsterm), 0);
+		if (e.code)
+		{
+			return e;
+		}
+		++p->cur;
+		ls_parentnode(p->ast, newlhs, rhs);
+		break;
+	}
 	case LS_ECAST:
 	{
 		uint32_t rhs;
@@ -1115,7 +1174,7 @@ ls_parseexprled(
 	{
 		uint8_t const mhsterm[] = {LS_COLON};
 		uint32_t mhs;
-		e = ls_parseexpr(p, &mhs, mhsterm, sizeof(mhsterm), 0);
+		e = ls_parseexpr(p, &mhs, mhsterm, ARRSIZE(mhsterm), 0);
 		if (e.code)
 		{
 			return e;

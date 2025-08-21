@@ -1,8 +1,8 @@
-import console;
+import std_console;
 
 func int
 start()
 {
-	println("hello world");
+	std_println("hello world");
 	return 0;
 }

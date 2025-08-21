@@ -1,4 +1,4 @@
-import console;
+import std_console;
 
 func void
 fizzbuzzrange(int start, int end, int step)
@@ -25,11 +25,11 @@ fizzbuzz(int n)
 	
 	if (len(accum) == 0)
 	{
-		println("${n}");
+		std_println("{n}");
 	}
 	else
 	{
-		println(accum);
+		std_println(accum);
 	}
 }
 

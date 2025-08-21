@@ -5,6 +5,7 @@
 //
 // left-to-right
 // ()      function call
+// []      access
 //
 // right-to-left
 // -       unary minus

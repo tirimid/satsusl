@@ -40,7 +40,7 @@ ls_primtype_t ls_toktoprim[LS_TOKTYPE_END] =
 
 static ls_err_t ls_redefinition(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, ls_tok_t cur, int64_t prev);
 static ls_err_t ls_semafuncdecl(ls_sema_t *s, uint32_t node);
-static ls_err_t ls_semadecl(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semalocaldecl(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semareturn(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semactree(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semawhile(ls_sema_t *s, uint32_t node);
@@ -51,6 +51,7 @@ static ls_err_t ls_semablock(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaeatom(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaesystem(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaecall(ls_sema_t *s, uint32_t node);
+static ls_err_t ls_semaeaccess(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaeneg(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaenot(ls_sema_t *s, uint32_t node);
 static ls_err_t ls_semaecast(ls_sema_t *s, uint32_t node);
@@ -78,7 +79,8 @@ static ls_err_t (*ls_semafns[LS_NODETYPE_END])(ls_sema_t *, uint32_t) =
 	[LS_ROOT] = NULL,
 	[LS_IMPORT] = NULL,
 	[LS_FUNCDECL] = ls_semafuncdecl,
-	[LS_DECL] = ls_semadecl,
+	[LS_GLOBALDECL] = NULL,
+	[LS_LOCALDECL] = ls_semalocaldecl,
 	[LS_ARGLIST] = NULL,
 	[LS_ARG] = NULL,
 	[LS_RETURN] = ls_semareturn,
@@ -96,6 +98,7 @@ static ls_err_t (*ls_semafns[LS_NODETYPE_END])(ls_sema_t *, uint32_t) =
 	[LS_EATOM] = ls_semaeatom,
 	[LS_ESYSTEM] = ls_semaesystem,
 	[LS_ECALL] = ls_semaecall,
+	[LS_EACCESS] = ls_semaeaccess,
 	[LS_ENEG] = ls_semaeneg,
 	[LS_ENOT] = ls_semaenot,
 	[LS_ECAST] = ls_semaecast,
@@ -128,6 +131,7 @@ static ls_primtype_t (*ls_typeoffns[LS_NODETYPE_END])(ls_typeof_t const *, uint3
 	[LS_EATOM] = ls_typeofeatom,
 	[LS_ESYSTEM] = ls_typeofesystem,
 	[LS_ECALL] = ls_typeofecall,
+	[LS_EACCESS] = ls_typeofpropagating,
 	[LS_ENEG] = ls_typeofpropagating,
 	[LS_ENOT] = ls_typeoflogical,
 	[LS_ECAST] = ls_typeofecast,
@@ -154,7 +158,7 @@ static ls_primtype_t (*ls_typeoffns[LS_NODETYPE_END])(ls_typeof_t const *, uint3
 	[LS_EMODASSIGN] = ls_typeofdiscarded
 };
 
-// *out takes ownership of *a, *l, name[0:strlen(name)], and data[0:len].
+// takes ownership of *a, *l, name[0:strlen(name)], and data[0:len].
 ls_module_t
 ls_createmodule(
 	ls_ast_t *a,
@@ -387,25 +391,56 @@ ls_globalsymtab(ls_symtab_t *out, ls_module_t const *m)
 	{
 		for (size_t j = 0; j < m->asts[i].nnodes; ++j)
 		{
-			if (m->asts[i].types[j] != LS_FUNCDECL)
+			if (m->asts[i].types[j] == LS_FUNCDECL)
 			{
-				continue;
+				ls_tok_t tok = m->lexes[i].toks[m->asts[i].nodes[j].tok];
+				
+				char sym[LS_MAXIDENT + 1] = {0};
+				ls_readtokraw(sym, m->data[i], tok);
+				
+				int64_t prev = ls_findsym(&st, sym);
+				if (prev != -1)
+				{
+					ls_err_t e = ls_redefinition(m, i, &st, tok, prev);
+					ls_destroysymtab(&st);
+					return e;
+				}
+				
+				ls_pushsym(&st, ls_strdup(sym), LS_FUNC, i, j, 0);
 			}
-			
-			ls_tok_t tok = m->lexes[i].toks[m->asts[i].nodes[j].tok];
-			
-			char sym[LS_MAXIDENT + 1] = {0};
-			ls_readtokraw(sym, m->data[i], tok);
-			
-			int64_t prev = ls_findsym(&st, sym);
-			if (prev != -1)
+			else if (m->asts[i].types[j] == LS_GLOBALDECL)
 			{
-				ls_err_t e = ls_redefinition(m, i, &st, tok, prev);
-				ls_destroysymtab(&st);
-				return e;
+				ls_tok_t tok = m->lexes[i].toks[m->asts[i].nodes[j].tok];
+				
+				char sym[LS_MAXIDENT + 1] = {0};
+				ls_readtokraw(sym, m->data[i], tok);
+				
+				int64_t prev = ls_findsym(&st, sym);
+				if (prev != -1)
+				{
+					ls_err_t e = ls_redefinition(m, i, &st, tok, prev);
+					ls_destroysymtab(&st);
+					return e;
+				}
+				
+				uint32_t ntype = m->asts[i].nodes[j].children[0];
+				ls_toktype_t typetok = m->lexes[i].types[m->asts[i].nodes[ntype].tok];
+				ls_primtype_t primtype = ls_toktoprim[typetok];
+				
+				if (primtype == LS_VOID)
+				{
+					return (ls_err_t)
+					{
+						.code = 1,
+						.src = i,
+						.pos = tok.pos,
+						.len = tok.len,
+						.msg = ls_strdup("declaration type cannot be void")
+					};
+				}
+				
+				ls_pushsym(&st, ls_strdup(sym), primtype, i, j, 0);
 			}
-			
-			ls_pushsym(&st, ls_strdup(sym), LS_FUNC, i, j, 0);
 		}
 	}
 	
@@ -465,7 +500,8 @@ ls_createsymtab(void)
 		{(void **)&st.types, 1, sizeof(uint8_t)},
 		{(void **)&st.mods, 1, sizeof(uint32_t)},
 		{(void **)&st.nodes, 1, sizeof(uint32_t)},
-		{(void **)&st.scopes, 1, sizeof(uint16_t)}
+		{(void **)&st.scopes, 1, sizeof(uint16_t)},
+		{(void **)&st.vals, 1, sizeof(ls_val_t)}
 	};
 	st.buf = ls_allocbatch(allocs, ARRSIZE(allocs));
 	
@@ -503,7 +539,8 @@ ls_pushsym(
 			{(void **)&st->types, st->symcap, 2 * st->symcap, sizeof(uint8_t)},
 			{(void **)&st->mods, st->symcap, 2 * st->symcap, sizeof(uint32_t)},
 			{(void **)&st->nodes, st->symcap, 2 * st->symcap, sizeof(uint32_t)},
-			{(void **)&st->scopes, st->symcap, 2 * st->symcap, sizeof(uint16_t)}
+			{(void **)&st->scopes, st->symcap, 2 * st->symcap, sizeof(uint16_t)},
+			{(void **)&st->vals, st->symcap, 2 * st->symcap, sizeof(ls_val_t)}
 		};
 		
 		st->buf = ls_reallocbatch(st->buf, reallocs, ARRSIZE(reallocs));
@@ -515,6 +552,7 @@ ls_pushsym(
 	st->mods[st->nsyms] = mod;
 	st->nodes[st->nsyms] = node;
 	st->scopes[st->nsyms] = scope;
+	st->vals[st->nsyms] = (ls_val_t){0};
 	++st->nsyms;
 }
 
@@ -523,6 +561,7 @@ ls_destroysymtab(ls_symtab_t *st)
 {
 	for (size_t i = 0; i < st->nsyms; ++i)
 	{
+		ls_destroyval(&st->vals[i]);
 		ls_free(st->syms[i]);
 	}
 	ls_free(st->buf);
@@ -570,6 +609,18 @@ ls_valuetypeof(
 {
 	ls_lex_t const *l = &m->lexes[mod];
 	ls_ast_t const *a = &m->asts[mod];
+	
+	if (a->types[node] == LS_EACCESS)
+	{
+		uint32_t nlhs = a->nodes[node].children[0];
+		
+		if (a->types[nlhs] != LS_EATOM)
+		{
+			return LS_RVALUE;
+		}
+		
+		return ls_valuetypeof(m, mod, st, nlhs);
+	}
 	
 	if (a->types[node] != LS_EATOM)
 	{
@@ -679,7 +730,7 @@ ls_semafuncdecl(ls_sema_t *s, uint32_t node)
 }
 
 static ls_err_t
-ls_semadecl(ls_sema_t *s, uint32_t node)
+ls_semalocaldecl(ls_sema_t *s, uint32_t node)
 {
 	ls_lex_t const *l = &s->m->lexes[s->mod];
 	ls_ast_t const *a = &s->m->asts[s->mod];
@@ -1070,7 +1121,24 @@ ls_semaeatom(ls_sema_t *s, uint32_t node)
 static ls_err_t
 ls_semaesystem(ls_sema_t *s, uint32_t node)
 {
+	ls_lex_t const *l = &s->m->lexes[s->mod];
 	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	if (a->nodes[node].nchildren - 1 > LS_MAXSYSARGS)
+	{
+		char msg[GENMSGLEN];
+		sprintf(msg, "number of system arguments (%u) exceeds max legal amount (%u)", a->nodes[node].nchildren - 1, LS_MAXSYSARGS);
+		
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup(msg)
+		};
+	}
 	
 	for (uint32_t i = 1; i < a->nodes[node].nchildren; ++i)
 	{
@@ -1188,6 +1256,56 @@ ls_semaecall(ls_sema_t *s, uint32_t node)
 				.msg = ls_strdup(msg)
 			};
 		}
+	}
+	
+	return (ls_err_t){0};
+}
+
+static ls_err_t
+ls_semaeaccess(ls_sema_t *s, uint32_t node)
+{
+	ls_lex_t const *l = &s->m->lexes[s->mod];
+	ls_ast_t const *a = &s->m->asts[s->mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	if (e.code)
+	{
+		return e;
+	}
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	
+	if (ls_typeof(s->m, s->mod, s->st, nlhs) != LS_STRING)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("left operand of [] must be of type string")
+		};
+	}
+	
+	if (ls_typeof(s->m, s->mod, s->st, nrhs) != LS_INT)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.src = s->mod,
+			.pos = tok.pos,
+			.len = tok.len,
+			.msg = ls_strdup("right operand of [] must be of type int")
+		};
 	}
 	
 	return (ls_err_t){0};
