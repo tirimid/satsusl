@@ -274,6 +274,14 @@ ls_exec(
 	ls_symtab_t globalst;
 	ls_globalsymtab(&globalst, m);
 	
+	for (uint32_t i = 0; i < globalst.nsyms; ++i)
+	{
+		if (globalst.types[i] != LS_FUNC)
+		{
+			// TODO: fixup values.
+		}
+	}
+	
 	int64_t entryfn = ls_findsym(&globalst, entry);
 	if (entryfn == -1)
 	{

@@ -1,9 +1,9 @@
 import std_console;
 
 func void
-fizzbuzzrange(int start, int end, int step)
+fizzbuzzrange(int lb, int ub, int step)
 {
-	for (var int i = start; i < end; i += step)
+	for (var int i = lb; i < ub; i += step)
 	{
 		fizzbuzz(i);
 	}
@@ -23,7 +23,7 @@ fizzbuzz(int n)
 		accum += "buzz";
 	}
 	
-	if (len(accum) == 0)
+	if (accum == "")
 	{
 		std_println("{n}");
 	}
