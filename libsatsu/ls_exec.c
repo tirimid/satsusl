@@ -332,7 +332,7 @@ ls_exec(
 	
 	ls_pushexecfn(&e, globalst.mods[entryfn]);
 	
-	ls_val_t v;
+	ls_val_t v = {0};
 	ls_execfuncdecl(&v, &e, globalst.nodes[entryfn]);
 	ls_destroyval(&v);
 	
@@ -412,7 +412,7 @@ static ls_val_t
 ls_sysprint(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
 {
 	char const *s = args[1].data.string;
-	if (dprintf(args[0].data.int_, "%s", s) != strlen(s))
+	if ((size_t)dprintf(args[0].data.int_, "%s", s) != strlen(s))
 	{
 		fprintf(e->logfp, "err: failure on dprintf() in system print!\n");
 	}
@@ -452,40 +452,80 @@ ls_sysreadln(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
 static ls_val_t
 ls_sysshell(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
 {
+	(void)e; (void)args;
 	// TODO: implement ls_sysshell().
+	return (ls_val_t){0};
 }
 
+// it is the caller's responsibility to setup and destroy the new function
+// environment and set arguments to their passed values.
 static ls_execaction_t
 ls_execfuncdecl(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
 	uint32_t mod = e->mods[e->fndepth - 1];
-	ls_symtab_t st = e->localsts[e->fndepth - 1];
 	
 	ls_lex_t const *l = &e->m->lexes[mod];
 	ls_ast_t const *a = &e->m->asts[mod];
 	
 	uint32_t ntype = a->nodes[node].children[0];
-	uint32_t narglist = a->nodes[node].children[1];
 	uint32_t nbody = a->nodes[node].children[2];
 	
-	for (uint32_t i = 0; i < a->nodes[narglist].nchildren; ++i)
+	ls_execaction_t action = ls_execfns[a->types[nbody]](out, e, nbody);
+	if (action != LS_RETURNVALUE)
 	{
-		// TODO: add function children.
+		ls_toktype_t typetok = l->types[a->nodes[ntype].tok];
+		ls_primtype_t primtype = ls_toktoprim[typetok];
+		*out = ls_defaultval(primtype);
 	}
 	
-	// TODO: run function body.
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execlocaldecl(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	ls_symtab_t *st = &e->localsts[e->fndepth - 1];
+	uint32_t scope = e->scopes[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t ntype = a->nodes[node].children[0];
+	uint32_t nval = a->nodes[node].children[1];
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, e->m->data[mod], tok);
+	
+	ls_toktype_t typetok = l->types[a->nodes[ntype].tok];
+	ls_primtype_t primtype = ls_toktoprim[typetok];
+	
+	ls_val_t v = {0};
+	ls_execfns[a->types[nval]](out, e, nval);
+	ls_pushsym(st, ls_strdup(sym), primtype, mod, node, scope);
+	st->vals[st->nsyms - 1] = v;
+	
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execreturn(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	if (!a->nodes[node].nchildren)
+	{
+		*out = ls_defaultval(LS_VOID);
+		return LS_RETURNVALUE;
+	}
+	
+	uint32_t nval = a->nodes[node].children[0];
+	
+	ls_execfns[a->types[nval]](out, e, nval);
+	return LS_RETURNVALUE;
 }
 
 static ls_execaction_t
@@ -509,31 +549,173 @@ ls_execfor(ls_val_t *out, ls_exec_t *e, uint32_t node)
 static ls_execaction_t
 ls_execbreak(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	return LS_STOPITER;
 }
 
 static ls_execaction_t
 ls_execcontinue(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	return LS_NEXTITER;
 }
 
 static ls_execaction_t
 ls_execblock(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	for (uint32_t i = 0; i < a->nodes[node].nchildren; ++i)
+	{
+		uint32_t stmt = a->nodes[node].children[i];
+		
+		ls_val_t v = {0};
+		ls_execaction_t action = ls_execfns[a->types[stmt]](&v, e, stmt);
+		if (action == LS_RETURNVALUE)
+		{
+			*out = v;
+			return LS_RETURNVALUE;
+		}
+		
+		ls_destroyval(&v);
+		if (action == LS_NEXTITER)
+		{
+			return LS_NEXTITER;
+		}
+		else if (action == LS_STOPITER)
+		{
+			return LS_STOPITER;
+		}
+	}
 }
 
 static ls_execaction_t
 ls_execeatom(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	ls_symtab_t *st = &e->localsts[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	switch (l->types[a->nodes[node].tok])
+	{
+	case LS_IDENT:
+		// TODO: implement.
+		break;
+	case LS_LITSTR:
+	{
+		ls_tok_t tok = l->toks[a->nodes[node].tok];
+		
+		char str[LS_MAXSTRING + 1] = {0};
+		ls_readtokstr(str, e->m->data[mod], tok);
+		
+		*out = (ls_val_t)
+		{
+			.type = LS_STRING,
+			.data.string = ls_strdup(str)
+		};
+		break;
+	}
+	case LS_LITINT:
+	{
+		ls_tok_t tok = l->toks[a->nodes[node].tok];
+		*out = (ls_val_t)
+		{
+			.type = LS_INT,
+			.data.int_ = ls_readtokint(e->m->data[mod], tok)
+		};
+		break;
+	}
+	case LS_LITREAL:
+	{
+		ls_tok_t tok = l->toks[a->nodes[node].tok];
+		*out = (ls_val_t)
+		{
+			.type = LS_REAL,
+			.data.real = ls_readtokreal(e->m->data[mod], tok)
+		};
+		break;
+	}
+	case LS_KWTRUE:
+		*out = (ls_val_t)
+		{
+			.type = LS_BOOL,
+			.data.bool_ = true
+		};
+		break;
+	case LS_KWFALSE:
+		*out = (ls_val_t)
+		{
+			.type = LS_BOOL,
+			.data.bool_ = false
+		};
+		break;
+	default:
+		break;
+	}
+	
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execesystem(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	ls_symtab_t *st = &e->localsts[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t ntype = a->nodes[node].children[0];
+	
+	ls_tok_t tok = l->toks[a->nodes[node].tok];
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, e->m->data[mod], tok);
+	
+	ls_toktype_t typetok = l->types[a->nodes[ntype].tok];
+	ls_primtype_t primtype = ls_toktoprim[typetok];
+	
+	int64_t sysfn = ls_findsysfn(e->sf, sym);
+	if (sysfn == -1)
+	{
+		fprintf(e->logfp, "err: system function %s not in system function table!\n", sym);
+		*out = ls_defaultval(primtype);
+		return LS_NOACTION;
+	}
+	
+	if (e->sf->nargs[sysfn] != a->nodes[node].nchildren - 1)
+	{
+		fprintf(e->logfp, "err: system function %s wants %u arguments, %u given!", sym, e->sf->nargs[sysfn], a->nodes[node].nchildren - 1);
+		*out = ls_defaultval(primtype);
+		return LS_NOACTION;
+	}
+	
+	ls_val_t args[LS_MAXSYSARGS] = {0};
+	for (uint32_t i = 1; i < a->nodes[node].nchildren; ++i)
+	{
+		uint32_t narg = a->nodes[node].children[i];
+		
+		ls_execfns[a->types[narg]](&args[i - 1], e, narg);
+		ls_primtype_t declargtype = e->sf->argtypes[sysfn][i - 1];
+		if (args[i - 1].type != declargtype)
+		{
+			fprintf(e->logfp, "err: system function %s given %s for argument %u when needed %s!\n", sym, ls_primtypenames[args[i - 1].type], i, ls_primtypenames[declargtype]);
+			for (size_t j = 0; j < LS_MAXSYSARGS; ++j)
+			{
+				ls_destroyval(&args[j]);
+				*out = ls_defaultval(primtype);
+				return LS_NOACTION;
+			}
+		}
+	}
+	
+	*out = e->sf->callbacks[sysfn](e, args);
+	for (size_t i = 0; i < LS_MAXSYSARGS; ++i)
+	{
+		ls_destroyval(&args[i]);
+	}
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
@@ -557,7 +739,18 @@ ls_execeneg(ls_val_t *out, ls_exec_t *e, uint32_t node)
 static ls_execaction_t
 ls_execenot(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nopnd = a->nodes[node].children[0];
+	
+	ls_val_t v;
+	ls_execfns[a->types[nopnd]](&v, e, nopnd);
+	v.data.bool_ = !v.data.bool_;
+	
+	*out = v;
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
@@ -635,25 +828,92 @@ ls_execenequal(ls_val_t *out, ls_exec_t *e, uint32_t node)
 static ls_execaction_t
 ls_execeand(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_val_t vl, vr;
+	ls_execfns[a->types[nlhs]](&vl, e, nlhs);
+	ls_execfns[a->types[nrhs]](&vr, e, nrhs);
+	
+	*out = (ls_val_t)
+	{
+		.type = LS_BOOL,
+		.data.bool_ = vl.data.bool_ && vr.data.bool_
+	};
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execeor(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_val_t vl, vr;
+	ls_execfns[a->types[nlhs]](&vl, e, nlhs);
+	ls_execfns[a->types[nrhs]](&vr, e, nrhs);
+	
+	*out = (ls_val_t)
+	{
+		.type = LS_BOOL,
+		.data.bool_ = vl.data.bool_ || vr.data.bool_
+	};
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execexor(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_val_t vl, vr;
+	ls_execfns[a->types[nlhs]](&vl, e, nlhs);
+	ls_execfns[a->types[nrhs]](&vr, e, nrhs);
+	
+	*out = (ls_val_t)
+	{
+		.type = LS_BOOL,
+		.data.bool_ = vl.data.bool_ != vr.data.bool_
+	};
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execeternary(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nmhs = a->nodes[node].children[1];
+	uint32_t nrhs = a->nodes[node].children[2];
+	
+	ls_val_t vcond;
+	ls_execfns[a->types[nlhs]](&vcond, e, nlhs);
+	
+	if (vcond.data.bool_)
+	{
+		ls_execfns[a->types[nmhs]](out, e, nmhs);
+	}
+	else
+	{
+		ls_execfns[a->types[nrhs]](out, e, nrhs);
+	}
+	return LS_NOACTION;
 }
 
 static ls_execaction_t

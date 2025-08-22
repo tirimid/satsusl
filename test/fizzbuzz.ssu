@@ -3,7 +3,7 @@ import std_console;
 func void
 fizzbuzzrange(int lb, int ub, int step)
 {
-	for (var int i = lb; i < ub; i += step)
+	for (new int i = lb; i < ub; i += step)
 	{
 		fizzbuzz(i);
 	}
@@ -12,7 +12,7 @@ fizzbuzzrange(int lb, int ub, int step)
 func void
 fizzbuzz(int n)
 {
-	var string accum = "";
+	new string accum = "";
 	
 	if (n % 3 == 0)
 	{

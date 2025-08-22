@@ -351,7 +351,7 @@ ls_parseroot(ls_parse_t *p, uint32_t *out)
 			}
 			ls_parentnode(p->ast, root, fn);
 		}
-		else if (type == LS_KWVAR)
+		else if (type == LS_KWNEW)
 		{
 			uint32_t decl;
 			ls_err_t e = ls_parseglobaldeclaration(p, &decl);
@@ -733,7 +733,7 @@ ls_parsefor(ls_parse_t *p, uint32_t *out)
 		return e;
 	}
 	
-	if (ls_nexttok(p) == LS_KWVAR)
+	if (ls_nexttok(p) == LS_KWNEW)
 	{
 		uint32_t init;
 		e = ls_parselocaldeclaration(p, &init);
@@ -861,7 +861,7 @@ ls_parsestmt(ls_parse_t *p, uint32_t *out)
 	}
 	
 	uint32_t stmt;
-	if (type == LS_KWVAR)
+	if (type == LS_KWNEW)
 	{
 		e = ls_parselocaldeclaration(p, &stmt);
 	}

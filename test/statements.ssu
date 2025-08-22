@@ -3,14 +3,14 @@ import std_console;
 import std_shell;
 
 // global variable declaration.
-var int thing;
+new int thing;
 
 // function declaration.
 func void
 start()
 {
 	// local variable declaration.
-	var int n = 100;
+	new int n = 100;
 	
 	// expression statement.
 	n += 1;
@@ -55,7 +55,7 @@ start()
 	}
 	
 	// augmented conditional loop.
-	for (var int i = 0; i < n; i += 1)
+	for (new int i = 0; i < n; i += 1)
 	{
 		// ...
 	}

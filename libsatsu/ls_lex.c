@@ -22,12 +22,12 @@ char const *ls_toknames[LS_TOKTYPE_END] =
 	"if",
 	"import",
 	"int",
+	"new",
 	"real",
 	"return",
 	"string",
 	"system",
 	"true",
-	"var",
 	"void",
 	"while",
 	
@@ -313,15 +313,37 @@ ls_readtokraw(char out[], char const *data, ls_tok_t tok)
 	ls_memcpy(out, &data[tok.pos], tok.len);
 }
 
+int64_t
+ls_readtokint(char const *data, ls_tok_t tok)
+{
+	(void)data;
+	(void)tok;
+	
+	// TODO: implement ls_readtokint().
+	
+	return 1;
+}
+
+double
+ls_readtokreal(char const *data, ls_tok_t tok)
+{
+	(void)data;
+	(void)tok;
+	
+	// TODO: implement ls_readtokreal().
+	
+	return 0.0;
+}
+
 void
-ls_readtokstr(char out[], size_t *outlen, char const *data, ls_tok_t tok)
+ls_readtokstr(char out[], char const *data, ls_tok_t tok)
 {
 	(void)out;
-	(void)outlen;
 	(void)data;
 	(void)tok;
 	
 	// TODO: implement ls_readtokstr().
+	strcpy(out, "boo boo ba ba");
 }
 
 void

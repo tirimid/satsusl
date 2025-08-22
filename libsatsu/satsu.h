@@ -43,12 +43,12 @@ typedef enum ls_toktype
 	LS_KWIF,
 	LS_KWIMPORT,
 	LS_KWINT,
+	LS_KWNEW,
 	LS_KWREAL,
 	LS_KWRETURN,
 	LS_KWSTRING,
 	LS_KWSYSTEM,
 	LS_KWTRUE,
-	LS_KWVAR,
 	LS_KWVOID,
 	LS_KWWHILE,
 	
@@ -303,7 +303,9 @@ void *ls_reallocbatch(void *p, ls_reallocbatch_t *reallocs, size_t nreallocs);
 ls_err_t ls_lex(ls_lex_t *out, char const *data, uint32_t len);
 void ls_addtok(ls_lex_t *l, ls_toktype_t type, uint32_t pos, uint32_t len);
 void ls_readtokraw(char out[], char const *data, ls_tok_t tok);
-void ls_readtokstr(char out[], size_t *outlen, char const *data, ls_tok_t tok);
+int64_t ls_readtokint(char const *data, ls_tok_t tok);
+double ls_readtokreal(char const *data, ls_tok_t tok);
+void ls_readtokstr(char out[], char const *data, ls_tok_t tok);
 void ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type);
 void ls_destroylex(ls_lex_t *l);
 
