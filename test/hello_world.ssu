@@ -1,8 +1,7 @@
 import std_console;
 
-func int
+func void
 start()
 {
 	std_println("hello world");
-	return 0;
 }

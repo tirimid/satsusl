@@ -6,7 +6,7 @@ import std_shell;
 var int thing;
 
 // function declaration.
-func int
+func void
 start()
 {
 	// local variable declaration.
@@ -60,12 +60,12 @@ start()
 		// ...
 	}
 	
-	// value return.
-	return 0;
+	// non-value return.
+	return;
 }
 
-func void
-nonvaluereturn()
+func int
+valuereturn()
 {
-	return;
+	return 100 + 200;
 }

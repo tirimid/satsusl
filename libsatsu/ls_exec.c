@@ -12,7 +12,7 @@ typedef struct ls_exec
 {
 	ls_module_t const *m;
 	ls_sysfns_t const *sf;
-	ls_symtab_t const *globalst;
+	ls_symtab_t *globalst;
 	FILE *logfp;
 	
 	void *buf;
@@ -22,7 +22,7 @@ typedef struct ls_exec
 	uint32_t fndepth, fndepthcap;
 } ls_exec_t;
 
-static ls_exec_t ls_createexec(ls_module_t const *m, ls_sysfns_t const *sf, ls_symtab_t const *globalst);
+static ls_exec_t ls_createexec(ls_module_t const *m, ls_sysfns_t const *sf, ls_symtab_t *globalst, FILE *logfp);
 static void ls_destroyexec(ls_exec_t *e);
 static void ls_pushexecfn(ls_exec_t *e, uint32_t mod);
 static void ls_popexecfn(ls_exec_t *e);
@@ -278,7 +278,7 @@ ls_exec(
 	{
 		if (globalst.types[i] != LS_FUNC)
 		{
-			// TODO: fixup values.
+			globalst.vals[i] = ls_defaultval(globalst.types[i]);
 		}
 	}
 	
@@ -288,12 +288,56 @@ ls_exec(
 		return (ls_err_t)
 		{
 			.code = 1,
-			.msg = ls_strdup("did not find entry function in program")
+			.msg = ls_strdup("did not find symbol with entry name in program")
 		};
 	}
 	
-	// TODO: implement most of ls_exec().
+	if (globalst.types[entryfn] != LS_FUNC)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.msg = ls_strdup("symbol matching entry name is not a function")
+		};
+	}
 	
+	ls_lex_t const *l = &m->lexes[globalst.mods[entryfn]];
+	ls_ast_t const *a = &m->asts[globalst.mods[entryfn]];
+	
+	uint32_t nfuncdecl = globalst.nodes[entryfn];
+	uint32_t ntype = a->nodes[nfuncdecl].children[0];
+	uint32_t narglist = a->nodes[nfuncdecl].children[1];
+	
+	ls_toktype_t typetok = l->types[a->nodes[ntype].tok];
+	ls_primtype_t rettype = ls_toktoprim[typetok];
+	if (rettype != LS_VOID)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.msg = ls_strdup("entry function must return void")
+		};
+	}
+	
+	if (a->nodes[narglist].nchildren != 0)
+	{
+		return (ls_err_t)
+		{
+			.code = 1,
+			.msg = ls_strdup("entry function must not take any arguments")
+		};
+	}
+	
+	ls_exec_t e = ls_createexec(m, sf, &globalst, logfp);
+	
+	ls_pushexecfn(&e, globalst.mods[entryfn]);
+	
+	ls_val_t v;
+	ls_execfuncdecl(&v, &e, globalst.nodes[entryfn]);
+	ls_destroyval(&v);
+	
+	ls_destroyexec(&e);
+	ls_destroysymtab(&globalst);
 	return (ls_err_t){0};
 }
 
@@ -301,7 +345,8 @@ static ls_exec_t
 ls_createexec(
 	ls_module_t const *m,
 	ls_sysfns_t const *sf,
-	ls_symtab_t const *globalst
+	ls_symtab_t *globalst,
+	FILE *logfp
 )
 {
 	ls_exec_t e =
@@ -309,6 +354,7 @@ ls_createexec(
 		.m = m,
 		.sf = sf,
 		.globalst = globalst,
+		.logfp = logfp,
 		.fndepthcap = 1
 	};
 	
@@ -412,7 +458,22 @@ ls_sysshell(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
 static ls_execaction_t
 ls_execfuncdecl(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement.
+	uint32_t mod = e->mods[e->fndepth - 1];
+	ls_symtab_t st = e->localsts[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t ntype = a->nodes[node].children[0];
+	uint32_t narglist = a->nodes[node].children[1];
+	uint32_t nbody = a->nodes[node].children[2];
+	
+	for (uint32_t i = 0; i < a->nodes[narglist].nchildren; ++i)
+	{
+		// TODO: add function children.
+	}
+	
+	// TODO: run function body.
 }
 
 static ls_execaction_t
