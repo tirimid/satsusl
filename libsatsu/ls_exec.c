@@ -658,12 +658,20 @@ ls_execfor(ls_val_t *out, ls_exec_t *e, uint32_t node)
 static ls_execaction_t
 ls_execbreak(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
+	(void)out;
+	(void)e;
+	(void)node;
+	
 	return LS_STOPITER;
 }
 
 static ls_execaction_t
 ls_execcontinue(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
+	(void)out;
+	(void)e;
+	(void)node;
+	
 	return LS_NEXTITER;
 }
 
@@ -1694,23 +1702,175 @@ ls_execeaddassign(ls_val_t *out, ls_exec_t *e, uint32_t node)
 static ls_execaction_t
 ls_execesubassign(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement ls_execesubassign().
+	(void)out;
+	
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_val_t v = {0};
+	ls_execfns[a->types[nrhs]](&v, e, nrhs);
+	
+	ls_tok_t tok = l->toks[a->nodes[nlhs].tok];
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, e->m->data[mod], tok);
+	
+	ls_val_t *dst;
+	int64_t decl = ls_findsym(&e->localsts[e->fndepth - 1], sym);
+	if (decl != -1)
+	{
+		dst = &e->localsts[e->fndepth - 1].vals[decl];
+	}
+	else
+	{
+		decl = ls_findsym(e->globalst, sym);
+		dst = &e->globalst->vals[decl];
+	}
+	
+	if (v.type == LS_INT)
+	{
+		dst->data.int_ -= v.data.int_;
+	}
+	else // real.
+	{
+		dst->data.real -= v.data.real;
+	}
+	
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execemulassign(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement ls_execemulassign().
+	(void)out;
+	
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_val_t v = {0};
+	ls_execfns[a->types[nrhs]](&v, e, nrhs);
+	
+	ls_tok_t tok = l->toks[a->nodes[nlhs].tok];
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, e->m->data[mod], tok);
+	
+	ls_val_t *dst;
+	int64_t decl = ls_findsym(&e->localsts[e->fndepth - 1], sym);
+	if (decl != -1)
+	{
+		dst = &e->localsts[e->fndepth - 1].vals[decl];
+	}
+	else
+	{
+		decl = ls_findsym(e->globalst, sym);
+		dst = &e->globalst->vals[decl];
+	}
+	
+	if (v.type == LS_INT)
+	{
+		dst->data.int_ *= v.data.int_;
+	}
+	else // real.
+	{
+		dst->data.real *= v.data.real;
+	}
+	
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execedivassign(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement ls_execedivassign().
+	(void)out;
+	
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_val_t v = {0};
+	ls_execfns[a->types[nrhs]](&v, e, nrhs);
+	
+	ls_tok_t tok = l->toks[a->nodes[nlhs].tok];
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, e->m->data[mod], tok);
+	
+	ls_val_t *dst;
+	int64_t decl = ls_findsym(&e->localsts[e->fndepth - 1], sym);
+	if (decl != -1)
+	{
+		dst = &e->localsts[e->fndepth - 1].vals[decl];
+	}
+	else
+	{
+		decl = ls_findsym(e->globalst, sym);
+		dst = &e->globalst->vals[decl];
+	}
+	
+	if (v.type == LS_INT)
+	{
+		dst->data.int_ /= v.data.int_;
+	}
+	else // real.
+	{
+		dst->data.real /= v.data.real;
+	}
+	
+	return LS_NOACTION;
 }
 
 static ls_execaction_t
 ls_execemodassign(ls_val_t *out, ls_exec_t *e, uint32_t node)
 {
-	// TODO: implement ls_execemodassign().
+	(void)out;
+	
+	uint32_t mod = e->mods[e->fndepth - 1];
+	
+	ls_lex_t const *l = &e->m->lexes[mod];
+	ls_ast_t const *a = &e->m->asts[mod];
+	
+	uint32_t nlhs = a->nodes[node].children[0];
+	uint32_t nrhs = a->nodes[node].children[1];
+	
+	ls_val_t v = {0};
+	ls_execfns[a->types[nrhs]](&v, e, nrhs);
+	
+	ls_tok_t tok = l->toks[a->nodes[nlhs].tok];
+	char sym[LS_MAXIDENT + 1] = {0};
+	ls_readtokraw(sym, e->m->data[mod], tok);
+	
+	ls_val_t *dst;
+	int64_t decl = ls_findsym(&e->localsts[e->fndepth - 1], sym);
+	if (decl != -1)
+	{
+		dst = &e->localsts[e->fndepth - 1].vals[decl];
+	}
+	else
+	{
+		decl = ls_findsym(e->globalst, sym);
+		dst = &e->globalst->vals[decl];
+	}
+	
+	if (v.type == LS_INT)
+	{
+		dst->data.int_ %= v.data.int_;
+	}
+	else // real.
+	{
+		dst->data.real = fmod(dst->data.real, v.data.real);
+	}
+	
+	return LS_NOACTION;
 }

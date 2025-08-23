@@ -4,7 +4,7 @@ INCLUDE="-Ilibsatsu"
 DEFINES=""
 WARNINGS="-Wall -Wextra -Wshadow"
 LIBRARIES=""
-CFLAGS="-std=c99 -pedantic -g3 -fsanitize=address -D_GNU_SOURCE"
+CFLAGS="-std=c99 -pedantic -g3 -Og -fsanitize=address -D_GNU_SOURCE"
 
 CC=gcc
 AR=ar
