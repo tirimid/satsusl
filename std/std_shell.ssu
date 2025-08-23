@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-var string std_shellout;
-var string std_shellerr;
+new string std_shellout;
+new string std_shellerr;
 
 func int
 std_shell(string cmd)
 {
-	var string __out = "";
-	var string __err = "";
+	new string __out = "";
+	new string __err = "";
 	
-	var int rc = system int shell(cmd);
+	new int rc = system int shell(cmd);
 	
 	std_shellout = __out;
 	std_shellerr = __err;

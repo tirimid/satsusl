@@ -25,7 +25,7 @@ fizzbuzz(int n)
 	
 	if (accum == "")
 	{
-		std_println("{n}");
+		std_println(n => string);
 	}
 	else
 	{

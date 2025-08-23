@@ -316,40 +316,59 @@ ls_readtokraw(char out[], char const *data, ls_tok_t tok)
 int64_t
 ls_readtokint(char const *data, ls_tok_t tok)
 {
-	(void)data;
-	(void)tok;
+	char buf[LS_MAXINT + 1] = {0};
+	size_t len = tok.len > LS_MAXINT ? LS_MAXINT : tok.len;
+	ls_memcpy(buf, &data[tok.pos], len);
 	
-	// TODO: implement ls_readtokint().
-	
-	return 1;
+	return strtoll(buf, NULL, 0);
 }
 
 double
 ls_readtokreal(char const *data, ls_tok_t tok)
 {
-	(void)data;
-	(void)tok;
+	char buf[LS_MAXREAL + 1] = {0};
+	size_t len = tok.len > LS_MAXREAL ? LS_MAXREAL : tok.len;
+	ls_memcpy(buf, &data[tok.pos], len);
 	
-	// TODO: implement ls_readtokreal().
-	
-	return 0.0;
+	return strtod(buf, NULL);
 }
 
 void
 ls_readtokstr(char out[], char const *data, ls_tok_t tok)
 {
-	(void)out;
-	(void)data;
-	(void)tok;
+	size_t len = 0;
 	
-	// TODO: implement ls_readtokstr().
-	strcpy(out, "boo boo ba ba");
+	for (size_t i = 1; len < LS_MAXSTRING && i + 1 < tok.len; ++i)
+	{
+		size_t di = tok.pos + i;
+		
+		if (data[di] == '\\')
+		{
+			if (data[di + 1] == 'n')
+			{
+				out[len++] = '\n';
+			}
+			else if (data[di + 1] == 't')
+			{
+				out[len++] = '\t';
+			}
+			else
+			{
+				out[len++] = data[di + 1];
+			}
+			
+			++i;
+			continue;
+		}
+		
+		out[len++] = data[di];
+	}
 }
 
 void
 ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type)
 {
-	fprintf(fp, "%-14s%u+%u\n", ls_toknames[type], tok.pos, tok.len);
+	fprintf(fp, "%-16s%u+%u\n", ls_toknames[type], tok.pos, tok.len);
 }
 
 void
@@ -430,7 +449,6 @@ ls_lexstr(ls_lex_t *l, char const *data, uint32_t len, size_t *i)
 		
 		++end;
 	}
-	--begin;
 	
 	if (end >= len)
 	{

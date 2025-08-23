@@ -16,7 +16,10 @@
 #define LS_NULL 0
 #define LS_MAXIDENT 63
 #define LS_MAXSTRING 1023
+#define LS_MAXINT 63
+#define LS_MAXREAL 63
 #define LS_BATCHALIGN 16
+#define LS_MAXREALLOCBATCH 32
 #define LS_MAXSYSARGS 6
 
 //--------------------//
@@ -257,7 +260,7 @@ typedef struct ls_symtab
 typedef struct ls_sysfns
 {
 	void *buf;
-	char **names;
+	char const **names;
 	ls_val_t (**callbacks)(struct ls_exec *, ls_val_t[LS_MAXSYSARGS]);
 	uint8_t *rettypes; // ls_primtype_t.
 	uint8_t (*argtypes)[LS_MAXSYSARGS]; // ls_primtype_t.
@@ -335,12 +338,13 @@ ls_valuetype_t ls_valuetypeof(ls_module_t const *m, uint32_t mod, ls_symtab_t co
 
 // exec.
 ls_val_t ls_defaultval(ls_primtype_t type);
+ls_val_t ls_copyval(ls_val_t const *v);
 void ls_destroyval(ls_val_t *v);
 ls_sysfns_t ls_emptysysfns(void);
 ls_sysfns_t ls_basesysfns(void);
 void ls_destroysysfns(ls_sysfns_t *sf);
 int64_t ls_findsysfn(ls_sysfns_t const *sf, char const *sysfn);
-void ls_pushsysfn(ls_sysfns_t *sf, char *name, ls_val_t (*callback)(struct ls_exec *, ls_val_t[LS_MAXSYSARGS]), ls_primtype_t rettype, ls_primtype_t argtypes[LS_MAXSYSARGS], uint8_t nargs);
+void ls_pushsysfn(ls_sysfns_t *sf, char const *name, ls_val_t (*callback)(struct ls_exec *, ls_val_t[LS_MAXSYSARGS]), ls_primtype_t rettype, ls_primtype_t argtypes[LS_MAXSYSARGS], uint8_t nargs);
 ls_err_t ls_exec(ls_module_t const *m, FILE *logfp, ls_sysfns_t const *sf, char const *entry);
 
 #endif

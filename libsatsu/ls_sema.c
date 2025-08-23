@@ -374,10 +374,10 @@ ls_destroymodule(ls_module_t *m)
 {
 	for (size_t i = 0; i < m->nmods; ++i)
 	{
-		free(m->names[i]);
-		free(m->data[i]);
-		ls_destroylex(&m->lexes[i]);
 		ls_destroyast(&m->asts[i]);
+		ls_destroylex(&m->lexes[i]);
+		free(m->data[i]);
+		free(m->names[i]);
 	}
 	free(m->buf);
 }
@@ -483,6 +483,7 @@ ls_sema(ls_module_t const *m)
 		}
 	}
 	
+	ls_destroysymtab(&st);
 	return (ls_err_t){0};
 }
 
@@ -1268,7 +1269,8 @@ ls_semaeaccess(ls_sema_t *s, uint32_t node)
 	ls_ast_t const *a = &s->m->asts[s->mod];
 	
 	uint32_t nlhs = a->nodes[node].children[0];
-	uint32_t nrhs = a->nodes[node].children[1];
+	uint32_t nmhs = a->nodes[node].children[1];
+	uint32_t nrhs = a->nodes[node].nchildren == 3 ? a->nodes[node].children[2] : 0;
 	
 	ls_err_t e = ls_semafns[a->types[nlhs]](s, nlhs);
 	if (e.code)
@@ -1276,10 +1278,19 @@ ls_semaeaccess(ls_sema_t *s, uint32_t node)
 		return e;
 	}
 	
-	e = ls_semafns[a->types[nrhs]](s, nrhs);
+	e = ls_semafns[a->types[nmhs]](s, nmhs);
 	if (e.code)
 	{
 		return e;
+	}
+	
+	if (nrhs)
+	{
+		e = ls_semafns[a->types[nrhs]](s, nrhs);
+		if (e.code)
+		{
+			return e;
+		}
 	}
 	
 	ls_tok_t tok = l->toks[a->nodes[node].tok];
@@ -1296,7 +1307,7 @@ ls_semaeaccess(ls_sema_t *s, uint32_t node)
 		};
 	}
 	
-	if (ls_typeof(s->m, s->mod, s->st, nrhs) != LS_INT)
+	if (ls_typeof(s->m, s->mod, s->st, nmhs) != LS_INT)
 	{
 		return (ls_err_t)
 		{
@@ -1304,8 +1315,23 @@ ls_semaeaccess(ls_sema_t *s, uint32_t node)
 			.src = s->mod,
 			.pos = tok.pos,
 			.len = tok.len,
-			.msg = ls_strdup("right operand of [] must be of type int")
+			.msg = ls_strdup("middle operand of [] must be of type int")
 		};
+	}
+	
+	if (nrhs)
+	{
+		if (ls_typeof(s->m, s->mod, s->st, nrhs) != LS_INT)
+		{
+			return (ls_err_t)
+			{
+				.code = 1,
+				.src = s->mod,
+				.pos = tok.pos,
+				.len = tok.len,
+				.msg = ls_strdup("right operand of [] must be of type int")
+			};
+		}
 	}
 	
 	return (ls_err_t){0};

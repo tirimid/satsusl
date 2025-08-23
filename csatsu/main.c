@@ -22,6 +22,9 @@
 int
 main(int argc, char *argv[])
 {
+	// superfluous code is included to destroy allocated objects, as address
+	// sanitizer otherwise reports erroneous memory leaks.
+	
 	a_proc(argc, argv);
 	
 	char *filedata;
@@ -30,6 +33,9 @@ main(int argc, char *argv[])
 	if (e.code)
 	{
 		err("main: failed to read file %s - %s!", a_args.infile, e.msg);
+		ls_destroyerr(&e);
+		free(filedata);
+		return 1;
 	}
 	
 	ls_lex_t lex;
@@ -37,6 +43,9 @@ main(int argc, char *argv[])
 	if (e.code)
 	{
 		errfile(a_args.infile, filedata, filelen, e.pos, e.len, "main: lex failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		free(filedata);
+		return 1;
 	}
 	
 	if (a_args.target == A_LEX)
@@ -45,6 +54,8 @@ main(int argc, char *argv[])
 		{
 			ls_printtok(stdout, lex.toks[i], lex.types[i]);
 		}
+		ls_destroylex(&lex);
+		free(filedata);
 		return 0;
 	}
 	
@@ -53,11 +64,18 @@ main(int argc, char *argv[])
 	if (e.code)
 	{
 		errfile(a_args.infile, filedata, filelen, e.pos, e.len, "main: parse failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroylex(&lex);
+		free(filedata);
+		return 1;
 	}
 	
 	if (a_args.target == A_PARSE)
 	{
 		ls_printast(stdout, &ast, &lex);
+		ls_destroyast(&ast);
+		ls_destroylex(&lex);
+		free(filedata);
 		return 0;
 	}
 	
@@ -74,11 +92,15 @@ main(int argc, char *argv[])
 	if (e.code)
 	{
 		errfile(a_args.infile, filedata, filelen, e.pos, e.len, "main: import resolution failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroymodule(&mod);
+		return 1;
 	}
 	
 	if (a_args.target == A_IMPORT)
 	{
 		ls_printmodule(stdout, &mod);
+		ls_destroymodule(&mod);
 		return 0;
 	}
 	
@@ -86,10 +108,14 @@ main(int argc, char *argv[])
 	if (e.code)
 	{
 		errfile(mod.names[e.src], mod.data[e.src], mod.lens[e.src], e.pos, e.len, "main: semantic analysis failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroymodule(&mod);
+		return 1;
 	}
 	
 	if (a_args.target == A_SEMA)
 	{
+		ls_destroymodule(&mod);
 		return 0;
 	}
 	
@@ -99,7 +125,13 @@ main(int argc, char *argv[])
 	if (e.code)
 	{
 		err("main: execution failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroysysfns(&sysfns);
+		ls_destroymodule(&mod);
+		return 1;
 	}
 	
+	ls_destroysysfns(&sysfns);
+	ls_destroymodule(&mod);
 	return 0;
 }

@@ -3,8 +3,8 @@
 INCLUDE="-Icsatsu -Ilibsatsu"
 DEFINES=""
 WARNINGS="-Wall -Wextra -Wshadow"
-LIBRARIES="-L. -lsatsu-bin"
-CFLAGS="-std=c99 -pedantic -Og -g3 -D_GNU_SOURCE"
+LIBRARIES="-L. -lsatsu-bin -lm"
+CFLAGS="-std=c99 -pedantic -Og -g3 -fsanitize=address -D_GNU_SOURCE"
 
 CC=gcc
 CFLAGS_FULL="$INCLUDE $DEFINES $WARNINGS $CFLAGS $LIBRARIES"

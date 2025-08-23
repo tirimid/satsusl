@@ -11,8 +11,6 @@ err(char const *fmt, ...)
 	fprintf(stderr, "%s\n", msg);
 	
 	va_end(args);
-	
-	exit(1);
 }
 
 void
@@ -36,8 +34,6 @@ errfile(
 	va_end(args);
 	
 	showfile(stderr, name, data, datalen, pos, len);
-	
-	exit(1);
 }
 
 void

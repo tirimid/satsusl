@@ -100,13 +100,11 @@ ls_allocbatch(ls_allocbatch_t *allocs, size_t nallocs)
 	return ptr;
 }
 
+// function assumes that nreallocs <= LS_MAXREALLOCBATCH.
 void *
 ls_reallocbatch(void *p, ls_reallocbatch_t *reallocs, size_t nreallocs)
 {
-	// TODO: there's certainly an optimization / simplification to be found here.
-	
-	size_t *oldoffsets = ls_malloc(nreallocs * sizeof(size_t));
-	size_t *newoffsets = ls_malloc(nreallocs * sizeof(size_t));
+	size_t oldoffsets[LS_MAXREALLOCBATCH], newoffsets[LS_MAXREALLOCBATCH];
 	
 	size_t newsize = 0, oldsize = 0;
 	for (size_t i = 0; i < nreallocs; ++i)
@@ -120,25 +118,22 @@ ls_reallocbatch(void *p, ls_reallocbatch_t *reallocs, size_t nreallocs)
 		oldsize = ls_alignbatch(oldsize);
 	}
 	
-	uint8_t *ptr = ls_realloc(p, newsize);
-	if (!ptr)
+	p = ls_realloc(p, newsize);
+	if (!p)
 	{
-		ls_free(newoffsets);
-		ls_free(oldoffsets);
 		return NULL;
 	}
 	
+	uint8_t *up = p;
 	for (ssize_t i = nreallocs - 1; i >= 0; --i)
 	{
 		size_t newbytes = reallocs[i].newn * reallocs[i].size;
 		size_t oldbytes = reallocs[i].oldn * reallocs[i].size;
 		size_t bytes = newbytes < oldbytes ? newbytes : oldbytes;
 		
-		ls_memmove(&ptr[newoffsets[i]], &ptr[oldoffsets[i]], bytes);
-		*reallocs[i].ptr = &ptr[newoffsets[i]];
+		ls_memmove(&up[newoffsets[i]], &up[oldoffsets[i]], bytes);
+		*reallocs[i].ptr = &up[newoffsets[i]];
 	}
 	
-	ls_free(newoffsets);
-	ls_free(oldoffsets);
-	return ptr;
+	return p;
 }

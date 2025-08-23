@@ -238,7 +238,7 @@ ls_printnode(
 	ls_tok_t tok = lex->toks[node.tok];
 	fprintf(
 		fp,
-		"%-12s %-14s %u+%u\n",
+		"%-12s %-16s %u+%u\n",
 		ls_nodenames[ast->types[n]],
 		ls_toknames[lex->types[node.tok]],
 		tok.pos,
@@ -1147,6 +1147,20 @@ ls_parseexprled(
 		break;
 	case LS_EACCESS:
 	{
+		uint8_t const mhsterm[] = {LS_COMMA, LS_RBRACKET};
+		uint32_t mhs;
+		e = ls_parseexpr(p, &mhs, mhsterm, ARRSIZE(mhsterm), 0);
+		if (e.code)
+		{
+			return e;
+		}
+		ls_parentnode(p->ast, newlhs, mhs);
+		
+		if (ls_nexttok(p) == LS_RBRACKET)
+		{
+			break;
+		}
+		
 		uint8_t const rhsterm[] = {LS_RBRACKET};
 		uint32_t rhs;
 		e = ls_parseexpr(p, &rhs, rhsterm, ARRSIZE(rhsterm), 0);
@@ -1156,6 +1170,7 @@ ls_parseexprled(
 		}
 		++p->cur;
 		ls_parentnode(p->ast, newlhs, rhs);
+		
 		break;
 	}
 	case LS_ECAST:

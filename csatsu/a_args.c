@@ -19,10 +19,12 @@ a_proc(i32 argc, char *argv[])
 			if (a_args.npaths >= A_MAXPATHS)
 			{
 				err("args: cannot have more than " STRINGIFY(A_MAXPATHS) " module paths!");
+				exit(1);
 			}
 			if (!strlen(optarg))
 			{
 				err("args: empty module path - %s!", optarg);
+				exit(1);
 			}
 			a_args.paths[a_args.npaths++] = optarg;
 			break;
@@ -50,6 +52,7 @@ a_proc(i32 argc, char *argv[])
 			else
 			{
 				err("args: unknown argument for -t - %s!", optarg);
+				exit(1);
 			}
 			break;
 		default:
@@ -60,6 +63,7 @@ a_proc(i32 argc, char *argv[])
 	if (optind + 1 != argc)
 	{
 		err("args: missing required positional argument!");
+		exit(1);
 	}
 	
 	a_args.infile = argv[optind];
@@ -67,6 +71,7 @@ a_proc(i32 argc, char *argv[])
 	if (!a_args.infp)
 	{
 		err("args: file cannot be read - %s!", argv[optind]);
+		exit(1);
 	}
 }
 
