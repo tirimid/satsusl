@@ -1,0 +1,13 @@
+import std_console;
+
+func void
+start()
+{
+	new string name = std_readprompt("what is your name? ");
+	new int age = std_readprompt("how old are you? ") => int;
+	new int birthyear = std_readprompt("when were you born? ") => int;
+	
+	new int curyear = birthyear + age;
+	
+	std_println("hello, " + name + ", the year is " + curyear => string);
+}

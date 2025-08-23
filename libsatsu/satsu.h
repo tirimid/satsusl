@@ -335,6 +335,7 @@ void ls_destroysymtab(ls_symtab_t *st);
 void ls_popsymscope(ls_symtab_t *st, uint16_t scope);
 ls_primtype_t ls_typeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
 ls_valuetype_t ls_valuetypeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
+void ls_printsymtab(FILE *fp, ls_symtab_t const *st);
 
 // exec.
 ls_val_t ls_defaultval(ls_primtype_t type);

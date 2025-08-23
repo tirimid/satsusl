@@ -574,6 +574,7 @@ ls_popsymscope(ls_symtab_t *st, uint16_t scope)
 	while (st->nsyms && st->scopes[st->nsyms - 1] >= scope)
 	{
 		--st->nsyms;
+		ls_destroyval(&st->vals[st->nsyms]);
 		ls_free(st->syms[st->nsyms]);
 	}
 }
@@ -644,6 +645,27 @@ ls_valuetypeof(
 	}
 	
 	return LS_LVALUE;
+}
+
+void
+ls_printsymtab(FILE *fp, ls_symtab_t const *st)
+{
+	for (size_t i = 0; i < st->nsyms; ++i)
+	{
+		fprintf(
+			fp,
+			"%s\n"
+			"\ttype   %s\n"
+			"\tmod    %u\n"
+			"\tnode   %u\n"
+			"\tscope  %u\n",
+			st->syms[i],
+			ls_primtypenames[st->types[i]],
+			st->mods[i],
+			st->nodes[i],
+			st->scopes[i]
+		);
+	}
 }
 
 static ls_err_t
