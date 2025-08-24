@@ -23,7 +23,7 @@ int
 main(int argc, char *argv[])
 {
 	// superfluous code is included to destroy allocated objects, as address
-	// sanitizer otherwise reports erroneous memory leaks.
+	// sanitizer otherwise sometimes reports erroneous memory leaks.
 	
 	a_proc(argc, argv);
 	

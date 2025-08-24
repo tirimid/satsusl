@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
+new int std_shellrc;
 new string std_shellout;
-new string std_shellerr;
 
-func int
+func bool
 std_shell(string cmd)
 {
+	new int __rc = 0;
 	new string __out = "";
-	new string __err = "";
 	
-	new int rc = system int shell(cmd);
+	new bool success = system bool shell(cmd);
 	
+	std_shellrc = __rc;
 	std_shellout = __out;
-	std_shellerr = __err;
 	
-	return rc;
+	return success;
 }

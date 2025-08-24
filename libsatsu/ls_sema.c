@@ -612,18 +612,6 @@ ls_valuetypeof(
 	ls_lex_t const *l = &m->lexes[mod];
 	ls_ast_t const *a = &m->asts[mod];
 	
-	if (a->types[node] == LS_EACCESS)
-	{
-		uint32_t nlhs = a->nodes[node].children[0];
-		
-		if (a->types[nlhs] != LS_EATOM)
-		{
-			return LS_RVALUE;
-		}
-		
-		return ls_valuetypeof(m, mod, st, nlhs);
-	}
-	
 	if (a->types[node] != LS_EATOM)
 	{
 		return LS_RVALUE;
