@@ -1,5 +1,6 @@
 /libsatsu-bin.o
 /libsatsu-bin.a
 /csatsu-bin
+/gsatsu-resources.o
 /gsatsu-bin
 /test.ssu
