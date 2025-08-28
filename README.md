@@ -19,15 +19,15 @@ the same, built upon libsatsu.
 
 ## Management
 
-* To build libsatsu, run `./libsatsu-build.sh`
-* To install libsatsu to the system, run `./libsatsu-install.sh` as root
-* To remove libsatsu from the system, run `./libsatsu-uninstall.sh` as root
-* To build csatsu, run `./csatsu-build.sh`
-* To install csatsu to the system, run `./csatsu-install.sh` as root
-* To remove csatsu from the system, run `./csatsu-uninstall.sh` as root
-* To build gsatsu, run `./gsatsu-build.sh`
-* To install gsatsu to the system, run `./gsatsu-install.sh` as root
-* To remove gsatsu from the system, run `./gsatsu-uninstall.sh` as root
+* To build libsatsu, run `./libsatsu/build.sh`
+* To install libsatsu to the system, run `./libsatsu/install.sh` as root
+* To remove libsatsu from the system, run `./libsatsu/uninstall.sh` as root
+* To build csatsu, run `./csatsu/build.sh`
+* To install csatsu to the system, run `./csatsu/install.sh` as root
+* To remove csatsu from the system, run `./csatsu/uninstall.sh` as root
+* To build gsatsu, run `./gsatsu/build.sh`
+* To install gsatsu to the system, run `./gsatsu/install.sh` as root
+* To remove gsatsu from the system, run `./gsatsu/uninstall.sh` as root
 
 Building csatsu and gsatsu requires first building libsatsu, as both programs
 rely on the library.
