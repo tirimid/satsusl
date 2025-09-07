@@ -33,6 +33,16 @@ main(int argc, char *argv[])
 	(void)argv;
 	
 	// initialize external systems.
+	tgl_conf = (tgl_conf_t)
+	{
+		.log = stderr,
+		.errtitle = O_ERRWNDTITLE,
+		.tickus = O_TICKUS,
+		.uipad = O_UIPAD,
+		.renderrect = r_tglrenderrect,
+		.rendertext = r_tglrendertext
+	};
+	
 	if (SDL_Init(O_SDLFLAGS))
 	{
 		tgl_err("main: failed to init SDL!");

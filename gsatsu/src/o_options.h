@@ -14,11 +14,13 @@
 #define O_TICKUS (1000 * O_TICKMS)
 #define O_MAXLOGLEN 512
 #define O_MAXUIELEMS 128
+#define O_MAXMODPATHS 5
+#define O_MAXIOLINES 10
 
 // stylistic options.
-#define O_FONTSIZE 24
+#define O_FONTSIZE 26
 #define O_UIFONT R_VCROSDMONO
-#define O_UIPAD
+#define O_UIPAD 8
 
 // color options.
 #define O_BGCOLOR 80, 80, 80, 255
