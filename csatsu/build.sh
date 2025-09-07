@@ -1,6 +1,6 @@
 #!/bin/bash
 
-INCLUDE="-Icsatsu -Ilibsatsu"
+INCLUDE="-Icsatsu/src -Ilibsatsu/src"
 DEFINES=""
 WARNINGS="-Wall -Wextra -Wshadow"
 LIBRARIES="-L. -lsatsu-bin -lm"
@@ -10,7 +10,7 @@ CC=gcc
 CFLAGS_FULL="$INCLUDE $DEFINES $WARNINGS $CFLAGS $LIBRARIES"
 
 echo "[$0] build: compilation" >&2
-$CC -o csatsu-bin csatsu/main.c $CFLAGS_FULL
+$CC -o csatsu-bin csatsu/src/main.c $CFLAGS_FULL
 if [ $? -ne 0 ]
 then
 	echo "[$0] build: failed to compile!" >&2

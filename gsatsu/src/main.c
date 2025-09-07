@@ -20,8 +20,10 @@
 #include "util.h"
 #include "resources.h"
 #include "r_render.h"
+#include "p_panel.h"
 
 // project source.
+#include "p_panel.c"
 #include "r_render.c"
 
 int
@@ -50,6 +52,8 @@ main(int argc, char *argv[])
 	{
 		return 1;
 	}
+	
+	p_run();
 	
 	return 0;
 }

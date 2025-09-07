@@ -1,6 +1,6 @@
 #!/bin/bash
 
-INCLUDE="-Igsatsu"
+INCLUDE="-Igsatsu/src -Igsatsu"
 DEFINES=""
 WARNING="-Wall -Wextra -Wshadow"
 LIBRARIES=""
@@ -18,7 +18,7 @@ then
 fi
 
 echo "[$0] resources: compilation" >&2
-$CC -o gsatsu-resources.o -c gsatsu/resources.c $CFLAGS_FULL
+$CC -o gsatsu-resources.o -c gsatsu/src/resources.c $CFLAGS_FULL
 if [ $? -ne 0 ]
 then
 	echo "[$0] resources: failed to compile!" >&2

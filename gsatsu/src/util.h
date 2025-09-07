@@ -16,8 +16,3 @@ typedef size_t usize;
 
 typedef float f32;
 typedef double f64;
-
-void err(char const *fmt, ...);
-u64 unixus(void);
-void begintick(void);
-void endtick(void);
