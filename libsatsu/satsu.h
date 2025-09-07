@@ -9,6 +9,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+//--------------------------//
+// library meta-information //
+//--------------------------//
+
+#define LS_VERMAJOR 1
+#define LS_VERMINOR 0
+#define LS_VERPATCH 0
+
 //--------//
 // macros //
 //--------//

@@ -11,18 +11,18 @@
 #include <SDL_ttf.h>
 #include <sys/time.h>
 
+// in-project dependencies.
+#define TGL_IMPLEMENTATION
+#include <tgl.h>
+
 // project headers.
 #include "o_options.h"
 #include "util.h"
+#include "resources.h"
 #include "r_render.h"
-#include "i_input.h"
-#include "u_ui.h"
 
 // project source.
-#include "i_input.c"
 #include "r_render.c"
-#include "u_ui.c"
-#include "util.c"
 
 int
 main(int argc, char *argv[])
@@ -33,14 +33,14 @@ main(int argc, char *argv[])
 	// initialize external systems.
 	if (SDL_Init(O_SDLFLAGS))
 	{
-		err("main: failed to init SDL!");
+		tgl_err("main: failed to init SDL!");
 		return 1;
 	}
 	atexit(SDL_Quit);
 	
 	if (TTF_Init())
 	{
-		err("main: failed to init SDL TTF!");
+		tgl_err("main: failed to init SDL TTF!");
 		return 1;
 	}
 	atexit(TTF_Quit);
