@@ -14,9 +14,11 @@
 // project headers.
 #include "util.h"
 #include "a_args.h"
+#include "e_exec.h"
 
 // project source.
 #include "a_args.c"
+#include "e_exec.c"
 #include "util.c"
 
 int
@@ -26,6 +28,12 @@ main(int argc, char *argv[])
 	// sanitizer otherwise sometimes reports erroneous memory leaks.
 	
 	a_proc(argc, argv);
+	
+	ls_conf = (ls_conf_t)
+	{
+		.cget = e_cget,
+		.cput = e_cput
+	};
 	
 	char *filedata;
 	u32 filelen;

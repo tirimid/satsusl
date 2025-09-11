@@ -29,6 +29,8 @@
 #define LS_BATCHALIGN 16
 #define LS_MAXREALLOCBATCH 32
 #define LS_MAXSYSARGS 6
+#define LS_CIGNORE 0x1fffffff
+#define LS_CERR 0x2fffffff
 
 //--------------------//
 // enumeration values //
@@ -276,10 +278,17 @@ typedef struct ls_sysfns
 	uint32_t nfns, fncap;
 } ls_sysfns_t;
 
+typedef struct ls_conf
+{
+	int (*cget)(void);
+	void (*cput)(int);
+} ls_conf_t;
+
 //-----------------------//
 // library configuration //
 //-----------------------//
 
+// memory.
 extern void *(*ls_malloc)(size_t);
 extern void *(*ls_realloc)(void *, size_t);
 extern void *(*ls_calloc)(size_t, size_t);
@@ -288,6 +297,9 @@ extern void (*ls_free)(void *);
 extern char *(*ls_strdup)(char const *);
 extern void *(*ls_memcpy)(void *, void const *, size_t);
 extern void *(*ls_memmove)(void *, void const *, size_t);
+
+// should be set before library use.
+extern ls_conf_t ls_conf;
 
 //-------------//
 // data tables //

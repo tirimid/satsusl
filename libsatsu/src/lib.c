@@ -29,3 +29,5 @@ void (*ls_free)(void *) = free;
 char *(*ls_strdup)(char const *) = strdup;
 void *(*ls_memcpy)(void *, void const *, size_t) = memcpy;
 void *(*ls_memmove)(void *, void const *, size_t) = memmove;
+
+ls_conf_t ls_conf;

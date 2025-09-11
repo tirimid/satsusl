@@ -29,7 +29,9 @@ static void ls_destroyexec(ls_exec_t *e);
 static void ls_pushexecfn(ls_exec_t *e, uint32_t mod, ls_symtab_t *st);
 static void ls_popexecfn(ls_exec_t *e);
 static ls_val_t ls_sysprint(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS]);
+static ls_val_t ls_syscprint(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS]);
 static ls_val_t ls_sysreadln(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS]);
+static ls_val_t ls_syscreadln(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS]);
 static ls_val_t ls_sysshell(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS]);
 static ls_execaction_t ls_execfuncdecl(ls_val_t *out, ls_exec_t *e, uint32_t node);
 static ls_execaction_t ls_execlocaldecl(ls_val_t *out, ls_exec_t *e, uint32_t node);
@@ -210,9 +212,16 @@ ls_basesysfns(void)
 	types[1] = LS_STRING;
 	ls_pushsysfn(&sf, "print", ls_sysprint, LS_VOID, types, 2);
 	
+	// system void cprint(string).
+	types[0] = LS_STRING;
+	ls_pushsysfn(&sf, "cprint", ls_syscprint, LS_VOID, types, 1);
+	
 	// system string readln(int).
 	types[0] = LS_INT;
 	ls_pushsysfn(&sf, "readln", ls_sysreadln, LS_STRING, types, 1);
+	
+	// system string creadln().
+	ls_pushsysfn(&sf, "creadln", ls_syscreadln, LS_STRING, types, 0);
 	
 	// system int shell(string).
 	types[0] = LS_STRING;
@@ -436,6 +445,20 @@ ls_sysprint(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
 }
 
 static ls_val_t
+ls_syscprint(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
+{
+	(void)e;
+	
+	char const *s = args[0].data.string;
+	while (*s)
+	{
+		ls_conf.cput(*s);
+		++s;
+	}
+	return ls_defaultval(LS_VOID);
+}
+
+static ls_val_t
 ls_sysreadln(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
 {
 	char buf[LS_MAXSTRING + 1] = {0};
@@ -456,6 +479,42 @@ ls_sysreadln(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
 		}
 		
 		buf[len++] = ch;
+	}
+	
+	return (ls_val_t)
+	{
+		.type = LS_STRING,
+		.data.string = ls_strdup(buf)
+	};
+}
+
+static ls_val_t
+ls_syscreadln(ls_exec_t *e, ls_val_t args[LS_MAXSYSARGS])
+{
+	(void)args;
+	
+	char buf[LS_MAXSTRING + 1] = {0};
+	size_t len = 0;
+	
+	while (len < LS_MAXSTRING)
+	{
+		int c = ls_conf.cget();
+		if (c == LS_CIGNORE)
+		{
+			continue;
+		}
+		else if (c == LS_CERR)
+		{
+			fprintf(e->logfp, LS_ERR "failure on cget() in system creadln!\n");
+			return ls_defaultval(LS_STRING);
+		}
+		
+		if (c == '\n')
+		{
+			break;
+		}
+		
+		buf[len++] = c;
 	}
 	
 	return (ls_val_t)
