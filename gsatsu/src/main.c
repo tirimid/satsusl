@@ -39,9 +39,12 @@ main(int argc, char *argv[])
 		.errtitle = O_ERRWNDTITLE,
 		.tickus = O_TICKUS,
 		.uipad = O_UIPAD,
+		.uitextfieldbar = O_UITEXTFIELDBAR,
 		.renderrect = r_tglrenderrect,
 		.rendertext = r_tglrendertext
 	};
+	
+	// TODO: init libsatsu conf.
 	
 	if (SDL_Init(O_SDLFLAGS))
 	{

@@ -1,8 +1,41 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
+static char inputfile[128] = {0};
+static tgl_tfdata_t inputfiletf =
+{
+	.buf = inputfile,
+	.cap = sizeof(inputfile) - 1
+};
+
+static char outputfile[128] = {0};
+static tgl_tfdata_t outputfiletf =
+{
+	.buf = outputfile,
+	.cap = sizeof(outputfile) - 1
+};
+
+static char modpaths[O_MAXMODPATHS][128] = {{0}};
+static tgl_tfdata_t modpathtfs[O_MAXMODPATHS];
+
+static char inputline[128] = {0};
+static tgl_tfdata_t inputlinetf =
+{
+	.buf = inputline,
+	.cap = sizeof(inputline) - 1
+};
+
 void
 p_run(void)
 {
+	for (size_t i = 0; i < O_MAXMODPATHS; ++i)
+	{
+		modpathtfs[i] = (tgl_tfdata_t)
+		{
+			.buf = modpaths[i],
+			.cap = sizeof(modpaths[i]) - 1
+		};
+	}
+	
 	for (;;)
 	{
 		tgl_begintick();
@@ -32,8 +65,8 @@ p_run(void)
 		
 		tgl_uilabel(&main, "Control panel");
 		tgl_uipad(&main, 0, 20);
-		tgl_uilabel(&main, "{input file}");
-		tgl_uilabel(&main, "{output file}");
+		tgl_uitextfield(&main, "Input file", &inputfiletf, 12);
+		tgl_uitextfield(&main, "Output file", &outputfiletf, 12);
 		tgl_uipad(&main, 0, 20);
 		if (tgl_uibutton(&main, "Execute"))
 		{
@@ -58,7 +91,7 @@ p_run(void)
 			modelems,
 			sizeof(modelems),
 			30,
-			400,
+			420,
 			r_fonts[R_VCROSDMONO],
 			r_wnd
 		);
@@ -67,7 +100,7 @@ p_run(void)
 		tgl_uipad(&mod, 0, 20);
 		for (i32 i = 0; i < O_MAXMODPATHS; ++i)
 		{
-			tgl_uilabel(&mod, "{module path}");
+			tgl_uitextfield(&mod, "Module path", &modpathtfs[i], 12);
 		}
 		
 		// do input / output UI panel.
@@ -88,7 +121,7 @@ p_run(void)
 			tgl_uilabel(&io, "{output line}");
 		}
 		tgl_uipad(&io, 0, 20);
-		tgl_uilabel(&io, "{input line}");
+		tgl_uitextfield(&io, "Input line", &inputlinetf, 28);
 		tgl_uibutton(&io, "Send input");
 		
 		// do program status panel.
@@ -97,7 +130,7 @@ p_run(void)
 			statuselems,
 			sizeof(statuselems),
 			260,
-			420,
+			660,
 			r_fonts[R_VCROSDMONO],
 			r_wnd
 		);

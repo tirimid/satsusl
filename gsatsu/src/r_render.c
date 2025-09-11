@@ -9,18 +9,6 @@ static resdata_t r_fontres[R_FONT_END] =
 	INCRES(vcr_osd_mono_ttf)
 };
 
-static u8 r_tglcolors[][4] =
-{
-	{O_UIPANELCOLOR},
-	{O_UITEXTCOLOR},
-	{O_UIBUTTONCOLOR},
-	{O_UIBUTTONPRESSCOLOR},
-	{O_UIBUTTONHOVERCOLOR},
-	{O_UITEXTCOLOR},
-	{O_UITEXTCOLOR},
-	{O_UITEXTCOLOR}
-};
-
 i32
 r_init(void)
 {
@@ -97,10 +85,10 @@ r_tglrenderrect(i32 x, i32 y, i32 w, i32 h, tgl_color_t col)
 {
 	SDL_SetRenderDrawColor(
 		r_rend,
-		r_tglcolors[col][0],
-		r_tglcolors[col][1],
-		r_tglcolors[col][2],
-		r_tglcolors[col][3]
+		tgl_defaultcolors[col][0],
+		tgl_defaultcolors[col][1],
+		tgl_defaultcolors[col][2],
+		tgl_defaultcolors[col][3]
 	);
 	
 	SDL_Rect r = {x, y, w, h};
@@ -113,10 +101,10 @@ r_tglrendertext(i32 x, i32 y, i32 w, i32 h, char const *text, tgl_color_t col)
 	SDL_Texture *tex = r_rendertext(
 		R_VCROSDMONO,
 		text,
-		r_tglcolors[col][0],
-		r_tglcolors[col][1],
-		r_tglcolors[col][2],
-		r_tglcolors[col][3]
+		tgl_defaultcolors[col][0],
+		tgl_defaultcolors[col][1],
+		tgl_defaultcolors[col][2],
+		tgl_defaultcolors[col][3]
 	);
 	
 	SDL_Rect dst = {x, y, w, h};
