@@ -12,12 +12,11 @@
 #include <sys/time.h>
 
 // in-project dependencies.
-#define TGL_IMPLEMENTATION
-#include <tgl.h>
+#define Z_IMPLEMENTATION
+#include <ztgl.h>
 
 // project headers.
 #include "o_options.h"
-#include "util.h"
 #include "resources.h"
 #include "r_render.h"
 #include "p_panel.h"
@@ -33,7 +32,7 @@ main(int argc, char *argv[])
 	(void)argv;
 	
 	// initialize external systems.
-	tgl_conf = (tgl_conf_t)
+	z_conf = (z_conf_t)
 	{
 		.log = stderr,
 		.errtitle = O_ERRWNDTITLE,
@@ -48,14 +47,14 @@ main(int argc, char *argv[])
 	
 	if (SDL_Init(O_SDLFLAGS))
 	{
-		tgl_err("main: failed to init SDL!");
+		z_err("main: failed to init SDL!");
 		return 1;
 	}
 	atexit(SDL_Quit);
 	
 	if (TTF_Init())
 	{
-		tgl_err("main: failed to init SDL TTF!");
+		z_err("main: failed to init SDL TTF!");
 		return 1;
 	}
 	atexit(TTF_Quit);

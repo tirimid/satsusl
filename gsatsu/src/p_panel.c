@@ -1,51 +1,46 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-static char inputfile[128] = {0};
-static tgl_tfdata_t inputfiletf =
+p_panel_t p_panel =
 {
-	.buf = inputfile,
-	.cap = sizeof(inputfile) - 1
-};
-
-static char outputfile[128] = {0};
-static tgl_tfdata_t outputfiletf =
-{
-	.buf = outputfile,
-	.cap = sizeof(outputfile) - 1
-};
-
-static char modpaths[O_MAXMODPATHS][128] = {{0}};
-static tgl_tfdata_t modpathtfs[O_MAXMODPATHS];
-
-static char inputline[128] = {0};
-static tgl_tfdata_t inputlinetf =
-{
-	.buf = inputline,
-	.cap = sizeof(inputline) - 1
+	.inputfiletf =
+	{
+		.buf = p_panel.inputfile,
+		.cap = sizeof(p_panel.inputfile)
+	},
+	.outputfiletf =
+	{
+		.buf = p_panel.outputfile,
+		.cap = sizeof(p_panel.outputfile)
+	},
+	.inputlinetf =
+	{
+		.buf = p_panel.inputline,
+		.cap = sizeof(p_panel.inputline)
+	}
 };
 
 void
 p_run(void)
 {
-	for (size_t i = 0; i < O_MAXMODPATHS; ++i)
+	for (usize i = 0; i < O_MAXMODPATHS; ++i)
 	{
-		modpathtfs[i] = (tgl_tfdata_t)
+		p_panel.modpathtfs[i] = (z_tfdata_t)
 		{
-			.buf = modpaths[i],
-			.cap = sizeof(modpaths[i]) - 1
+			.buf = p_panel.modpaths[i],
+			.cap = sizeof(p_panel.modpaths[i]) - 1
 		};
 	}
 	
 	for (;;)
 	{
-		tgl_begintick();
+		z_begintick();
 		
 		// handle events.
-		tgl_prepareinput();
+		z_prepareinput();
 		SDL_Event e;
 		while (SDL_PollEvent(&e))
 		{
-			tgl_handleinput(&e);
+			z_handleinput(&e);
 			if (e.type == SDL_QUIT)
 			{
 				return;
@@ -53,8 +48,8 @@ p_run(void)
 		}
 		
 		// do main UI panel.
-		tgl_uielem_t mainelems[64];
-		tgl_ui_t main = tgl_beginui(
+		z_uielem_t mainelems[64];
+		z_ui_t main = z_beginui(
 			mainelems,
 			sizeof(mainelems),
 			30,
@@ -63,31 +58,36 @@ p_run(void)
 			r_wnd
 		);
 		
-		tgl_uilabel(&main, "Control panel");
-		tgl_uipad(&main, 0, 20);
-		tgl_uitextfield(&main, "Input file", &inputfiletf, 12);
-		tgl_uitextfield(&main, "Output file", &outputfiletf, 12);
-		tgl_uipad(&main, 0, 20);
-		if (tgl_uibutton(&main, "Execute"))
+		z_uilabel(&main, "Control panel");
+		z_uipad(&main, 0, 20);
+		z_uitextfield(&main, "Input file", &p_panel.inputfiletf, 12);
+		z_uitextfield(&main, "Output file", &p_panel.outputfiletf, 12);
+		z_uipad(&main, 0, 20);
+		if (z_uibutton(&main, "Execute"))
 		{
+			p_clearoutput();
 		}
-		tgl_uipad(&main, 0, 20);
-		if (tgl_uibutton(&main, "Lex"))
+		z_uipad(&main, 0, 20);
+		if (z_uibutton(&main, "Lex"))
 		{
+			p_pushoutput("tried to lex");
 		}
-		if (tgl_uibutton(&main, "Parse"))
+		if (z_uibutton(&main, "Parse"))
 		{
+			p_pushoutput("tried to parse");
 		}
-		if (tgl_uibutton(&main, "Import"))
+		if (z_uibutton(&main, "Import"))
 		{
+			p_pushoutput("tried to import");
 		}
-		if (tgl_uibutton(&main, "Sema"))
+		if (z_uibutton(&main, "Sema"))
 		{
+			p_pushoutput("tried to sema");
 		}
 		
 		// do module path UI panel.
-		tgl_uielem_t modelems[64];
-		tgl_ui_t mod = tgl_beginui(
+		z_uielem_t modelems[64];
+		z_ui_t mod = z_beginui(
 			modelems,
 			sizeof(modelems),
 			30,
@@ -96,16 +96,16 @@ p_run(void)
 			r_wnd
 		);
 		
-		tgl_uilabel(&mod, "Module paths");
-		tgl_uipad(&mod, 0, 20);
+		z_uilabel(&mod, "Module paths");
+		z_uipad(&mod, 0, 20);
 		for (i32 i = 0; i < O_MAXMODPATHS; ++i)
 		{
-			tgl_uitextfield(&mod, "Module path", &modpathtfs[i], 12);
+			z_uitextfield(&mod, "Module path", &p_panel.modpathtfs[i], 12);
 		}
 		
 		// do input / output UI panel.
-		tgl_uielem_t ioelems[64];
-		tgl_ui_t io = tgl_beginui(
+		z_uielem_t ioelems[64];
+		z_ui_t io = z_beginui(
 			ioelems,
 			sizeof(ioelems),
 			260,
@@ -114,19 +114,21 @@ p_run(void)
 			r_wnd
 		);
 		
-		tgl_uilabel(&io, "Input / output terminal");
-		tgl_uipad(&io, 0, 20);
-		for (i32 i = 0; i < O_MAXIOLINES; ++i)
+		z_uilabel(&io, "Input / output terminal");
+		z_uipad(&io, 0, 20);
+		for (i32 i = O_NOUTPUTLINES - 1; i >= 0; --i)
 		{
-			tgl_uilabel(&io, "{output line}");
+			z_uilabel(&io, p_panel.outputlines[i]);
 		}
-		tgl_uipad(&io, 0, 20);
-		tgl_uitextfield(&io, "Input line", &inputlinetf, 28);
-		tgl_uibutton(&io, "Send input");
+		z_uipad(&io, 0, 20);
+		z_uitextfield(&io, "Input line", &p_panel.inputlinetf, O_MAXIOLINE);
+		if (z_uibutton(&io, "Send input"))
+		{
+		}
 		
 		// do program status panel.
-		tgl_uielem_t statuselems[64];
-		tgl_ui_t status = tgl_beginui(
+		z_uielem_t statuselems[64];
+		z_ui_t status = z_beginui(
 			statuselems,
 			sizeof(statuselems),
 			260,
@@ -135,19 +137,44 @@ p_run(void)
 			r_wnd
 		);
 		
-		tgl_uilabel(&status, "Program status");
-		tgl_uipad(&status, 0, 20);
-		tgl_uilabel(&status, "{program status}");
+		z_uilabel(&status, "Program status");
+		z_uipad(&status, 0, 20);
+		z_uilabel(&status, "{program status}");
 		
 		// render.
 		SDL_SetRenderDrawColor(r_rend, O_BGCOLOR);
 		SDL_RenderClear(r_rend);
-		tgl_renderui(&main);
-		tgl_renderui(&mod);
-		tgl_renderui(&io);
-		tgl_renderui(&status);
+		z_renderui(&main);
+		z_renderui(&mod);
+		z_renderui(&io);
+		z_renderui(&status);
 		SDL_RenderPresent(r_rend);
 		
-		tgl_endtick();
+		z_endtick();
+	}
+}
+
+void
+p_clearoutput(void)
+{
+	for (usize i = 0; i < O_NOUTPUTLINES; ++i)
+	{
+		memset(&p_panel.outputlines[i], 0, sizeof(p_panel.outputlines[i]));
+	}
+}
+
+void
+p_pushoutput(char const *line)
+{
+	memmove(
+		&p_panel.outputlines[1],
+		&p_panel.outputlines[0],
+		sizeof(p_panel.outputlines[0]) * (O_NOUTPUTLINES - 1)
+	);
+	
+	memset(&p_panel.outputlines[0], 0, sizeof(p_panel.outputlines[0]));
+	for (usize i = 0; i < O_MAXIOLINE && line[i]; ++i)
+	{
+		p_panel.outputlines[0][i] = line[i];
 	}
 }

@@ -22,14 +22,14 @@ r_init(void)
 	);
 	if (!r_wnd)
 	{
-		tgl_err("render: failed to create window - %s!", SDL_GetError());
+		z_err("render: failed to create window - %s!", SDL_GetError());
 		return 1;
 	}
 	
 	r_rend = SDL_CreateRenderer(r_wnd, -1, O_RENDFLAGS);
 	if (!r_rend)
 	{
-		tgl_err("render: failed to create renderer - %s!", SDL_GetError());
+		z_err("render: failed to create renderer - %s!", SDL_GetError());
 		return 1;
 	}
 	
@@ -39,14 +39,14 @@ r_init(void)
 		SDL_RWops *rwops = SDL_RWFromConstMem(r_fontres[i].data, *r_fontres[i].size);
 		if (!rwops)
 		{
-			tgl_err("render: failed to create font RWops - %s!", SDL_GetError());
+			z_err("render: failed to create font RWops - %s!", SDL_GetError());
 			return 1;
 		}
 		
 		r_fonts[i] = TTF_OpenFontRW(rwops, 1, O_FONTSIZE);
 		if (!r_fonts[i])
 		{
-			tgl_err("render: failed to open font - %s!", TTF_GetError());
+			z_err("render: failed to open font - %s!", TTF_GetError());
 			return 1;
 		}
 	}
@@ -81,14 +81,14 @@ r_rendertext(r_font_t font, char const *text, u8 r, u8 g, u8 b, u8 a)
 }
 
 void
-r_tglrenderrect(i32 x, i32 y, i32 w, i32 h, tgl_color_t col)
+r_tglrenderrect(i32 x, i32 y, i32 w, i32 h, z_color_t col)
 {
 	SDL_SetRenderDrawColor(
 		r_rend,
-		tgl_defaultcolors[col][0],
-		tgl_defaultcolors[col][1],
-		tgl_defaultcolors[col][2],
-		tgl_defaultcolors[col][3]
+		z_defaultcolors[col][0],
+		z_defaultcolors[col][1],
+		z_defaultcolors[col][2],
+		z_defaultcolors[col][3]
 	);
 	
 	SDL_Rect r = {x, y, w, h};
@@ -96,15 +96,15 @@ r_tglrenderrect(i32 x, i32 y, i32 w, i32 h, tgl_color_t col)
 }
 
 void
-r_tglrendertext(i32 x, i32 y, i32 w, i32 h, char const *text, tgl_color_t col)
+r_tglrendertext(i32 x, i32 y, i32 w, i32 h, char const *text, z_color_t col)
 {
 	SDL_Texture *tex = r_rendertext(
 		R_VCROSDMONO,
 		text,
-		tgl_defaultcolors[col][0],
-		tgl_defaultcolors[col][1],
-		tgl_defaultcolors[col][2],
-		tgl_defaultcolors[col][3]
+		z_defaultcolors[col][0],
+		z_defaultcolors[col][1],
+		z_defaultcolors[col][2],
+		z_defaultcolors[col][3]
 	);
 	
 	SDL_Rect dst = {x, y, w, h};

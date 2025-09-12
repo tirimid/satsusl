@@ -15,7 +15,8 @@
 #define O_MAXLOGLEN 512
 #define O_MAXUIELEMS 128
 #define O_MAXMODPATHS 7
-#define O_MAXIOLINES 20
+#define O_NOUTPUTLINES 20
+#define O_MAXIOLINE 28
 
 // stylistic options.
 #define O_FONTSIZE 26
