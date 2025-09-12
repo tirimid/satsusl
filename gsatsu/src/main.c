@@ -12,7 +12,7 @@
 #include <sys/time.h>
 
 // in-project dependencies.
-#define Z_IMPLEMENTATION
+#include <satsu.h>
 #include <ztgl.h>
 
 // project headers.
@@ -43,7 +43,11 @@ main(int argc, char *argv[])
 		.rendertext = r_tglrendertext
 	};
 	
-	// TODO: init libsatsu conf.
+	ls_conf = (ls_conf_t)
+	{
+		.cget = p_cget,
+		.cput = p_cput
+	};
 	
 	if (SDL_Init(O_SDLFLAGS))
 	{

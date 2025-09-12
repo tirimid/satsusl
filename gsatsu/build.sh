@@ -1,7 +1,7 @@
 #!/bin/bash
 
 INCLUDE="-Igsatsu/src -Ilibsatsu/src -Igsatsu/dep"
-DEFINES=""
+DEFINES="-DZ_IMPLEMENTATION"
 WARNINGS="-Wall -Wextra -Wshadow"
 LIBRARIES="-L. -lsatsu-bin -lm $(pkg-config --cflags --libs sdl2 SDL2_ttf)"
 CFLAGS="-std=c99 -pedantic -O3 -D_GNU_SOURCE"

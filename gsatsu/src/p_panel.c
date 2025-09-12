@@ -66,23 +66,28 @@ p_run(void)
 		if (z_uibutton(&main, "Execute"))
 		{
 			p_clearoutput();
+			p_exec();
 		}
 		z_uipad(&main, 0, 20);
 		if (z_uibutton(&main, "Lex"))
 		{
-			p_pushoutput("tried to lex");
+			p_clearoutput();
+			p_lex();
 		}
 		if (z_uibutton(&main, "Parse"))
 		{
-			p_pushoutput("tried to parse");
+			p_clearoutput();
+			p_parse();
 		}
 		if (z_uibutton(&main, "Import"))
 		{
-			p_pushoutput("tried to import");
+			p_clearoutput();
+			p_import();
 		}
 		if (z_uibutton(&main, "Sema"))
 		{
-			p_pushoutput("tried to sema");
+			p_clearoutput();
+			p_sema();
 		}
 		
 		// do module path UI panel.
@@ -124,22 +129,8 @@ p_run(void)
 		z_uitextfield(&io, "Input line", &p_panel.inputlinetf, O_MAXIOLINE);
 		if (z_uibutton(&io, "Send input"))
 		{
+			// TODO: implement send input.
 		}
-		
-		// do program status panel.
-		z_uielem_t statuselems[64];
-		z_ui_t status = z_beginui(
-			statuselems,
-			sizeof(statuselems),
-			260,
-			660,
-			r_fonts[R_VCROSDMONO],
-			r_wnd
-		);
-		
-		z_uilabel(&status, "Program status");
-		z_uipad(&status, 0, 20);
-		z_uilabel(&status, "{program status}");
 		
 		// render.
 		SDL_SetRenderDrawColor(r_rend, O_BGCOLOR);
@@ -147,7 +138,6 @@ p_run(void)
 		z_renderui(&main);
 		z_renderui(&mod);
 		z_renderui(&io);
-		z_renderui(&status);
 		SDL_RenderPresent(r_rend);
 		
 		z_endtick();
@@ -177,4 +167,66 @@ p_pushoutput(char const *line)
 	{
 		p_panel.outputlines[0][i] = line[i];
 	}
+}
+
+i32
+p_cget(void)
+{
+	if (!p_panel.cgetlen)
+	{
+		return LS_CIGNORE;
+	}
+	
+	if (p_panel.cgetidx >= p_panel.cgetlen)
+	{
+		p_panel.cgetidx = 0;
+		p_panel.cgetlen = 0;
+		return '\n';
+	}
+	
+	return p_panel.cgetbuf[p_panel.cgetidx++];
+}
+
+void
+p_cput(i32 c)
+{
+	if (c == '\n')
+	{
+		p_panel.cputbuf[p_panel.cputlen - 1] = 0;
+		p_panel.cputlen = 0;
+		p_pushoutput(p_panel.cputbuf);
+		return;
+	}
+	
+	p_panel.cputbuf[p_panel.cputlen++] = c;
+}
+
+void
+p_lex(void)
+{
+	// TODO: implement.
+}
+
+void
+p_parse(void)
+{
+	// TODO: implement.
+}
+
+void
+p_import(void)
+{
+	// TODO: implement.
+}
+
+void
+p_sema(void)
+{
+	// TODO: implement.
+}
+
+void
+p_exec(void)
+{
+	// TODO: implement.
 }
