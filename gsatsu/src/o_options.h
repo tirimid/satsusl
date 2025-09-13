@@ -4,8 +4,8 @@
 #define O_SDLFLAGS SDL_INIT_VIDEO
 #define O_ERRWNDTITLE "gsatsu - Error"
 #define O_WNDTITLE "gsatsu"
-#define O_WNDWIDTH 730
-#define O_WNDHEIGHT 770
+#define O_WNDWIDTH 1000
+#define O_WNDHEIGHT 720
 #define O_WNDFLAGS 0
 #define O_RENDFLAGS 0
 
@@ -15,11 +15,11 @@
 #define O_MAXLOGLEN 512
 #define O_MAXUIELEMS 128
 #define O_MAXMODPATHS 7
-#define O_NOUTPUTLINES 25
-#define O_MAXIOLINE 28
+#define O_NOUTPUTLINES 26
+#define O_MAXIOLINE 55
 
 // stylistic options.
-#define O_FONTSIZE 26
+#define O_FONTSIZE 22
 #define O_UIFONT R_VCROSDMONO
 #define O_UIPAD 8
 #define O_UITEXTFIELDBAR 3
