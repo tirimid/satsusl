@@ -237,7 +237,7 @@ p_showfile(
 	sprintf(linum, "%u", line);
 	usize linumlen = strlen(linum);
 	
-	ls_cprintf("%s:\n %u |", name, linum);
+	ls_cprintf("%s:\n %u |", name, line);
 	for (usize i = lbegin; i < lend; ++i)
 	{
 		if (data[i] == '\t')
@@ -250,7 +250,7 @@ p_showfile(
 		}
 	}
 	
-	ls_cprintf("  ");
+	ls_cprintf("\n ");
 	for (usize i = 0; i <= linumlen; ++i)
 	{
 		p_cput(' ');
@@ -449,13 +449,120 @@ p_import(void)
 		filelen
 	);
 	
-	// TODO: finish implementing.
+	usize nmodpaths = 0;
+	char *modpaths[O_MAXMODPATHS];
+	for (usize i = 0; i < O_MAXMODPATHS; ++i)
+	{
+		if (p_panel.modpaths[i][0])
+		{
+			modpaths[nmodpaths++] = strdup(p_panel.modpaths[i]);
+		}
+	}
+	
+	e = ls_resolveimports(&mod, (char const **)modpaths, nmodpaths);
+	for (usize i = 0; i < nmodpaths; ++i)
+	{
+		free(modpaths[i]);
+	}
+	if (e.code)
+	{
+		p_errfile(p_panel.inputfile, filedata, filelen, e.pos, e.len, "import: import resolution failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroymodule(&mod);
+		return;
+	}
+	
+	ls_cprintmodule(&mod);
+	
+	ls_destroymodule(&mod);
 }
 
 void
 p_sema(void)
 {
-	// TODO: implement.
+	FILE *fp = fopen(p_panel.inputfile, "rb");
+	if (!fp)
+	{
+		p_err("sema: failed to open file %s!", p_panel.inputfile);
+		return;
+	}
+	
+	char *filedata;
+	u32 filelen;
+	ls_err_t e = ls_readfile(fp, &filedata, &filelen);
+	fclose(fp);
+	if (e.code)
+	{
+		p_err("sema: failed to read file %s - %s!", p_panel.inputfile, e.msg);
+		ls_destroyerr(&e);
+		return;
+	}
+	
+	ls_lex_t lex;
+	e = ls_lex(&lex, filedata, filelen);
+	if (e.code)
+	{
+		p_errfile(p_panel.inputfile, filedata, filelen, e.pos, e.len, "sema: lex failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		free(filedata);
+		return;
+	}
+	
+	ls_ast_t ast;
+	e = ls_parse(&ast, &lex);
+	if (e.code)
+	{
+		p_errfile(p_panel.inputfile, filedata, filelen, e.pos, e.len, "sema: parse failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroylex(&lex);
+		free(filedata);
+		return;
+	}
+	
+	ls_module_t mod = ls_createmodule(
+		&ast,
+		&lex,
+		strdup(p_panel.inputfile),
+		ls_fileid(p_panel.inputfile, true),
+		filedata,
+		filelen
+	);
+	
+	usize nmodpaths = 0;
+	char *modpaths[O_MAXMODPATHS];
+	for (usize i = 0; i < O_MAXMODPATHS; ++i)
+	{
+		if (p_panel.modpaths[i][0])
+		{
+			modpaths[nmodpaths++] = strdup(p_panel.modpaths[i]);
+		}
+	}
+	
+	e = ls_resolveimports(&mod, (char const **)modpaths, nmodpaths);
+	for (usize i = 0; i < nmodpaths; ++i)
+	{
+		free(modpaths[i]);
+	}
+	if (e.code)
+	{
+		p_errfile(p_panel.inputfile, filedata, filelen, e.pos, e.len, "sema: import resolution failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroymodule(&mod);
+		return;
+	}
+	
+	e = ls_sema(&mod);
+	if (e.code)
+	{
+		p_errfile(mod.names[e.src], mod.data[e.src], mod.lens[e.src], e.pos, e.len, "sema: semantic analysis failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		ls_destroymodule(&mod);
+		return;
+	}
+	
+	p_pushoutput("sema: finished successfully");
+	
+	ls_destroymodule(&mod);
 }
 
 void
