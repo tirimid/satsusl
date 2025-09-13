@@ -17,7 +17,7 @@ typedef struct p_panel
 	
 	// cget / cput interface data.
 	char cgetbuf[128];
-	char cputbuf[128];
+	char cputbuf[O_MAXIOLINE + 1];
 	usize cgetlen;
 	usize cgetidx;
 	usize cputlen;
@@ -28,6 +28,9 @@ extern p_panel_t p_panel;
 void p_run(void);
 void p_clearoutput(void);
 void p_pushoutput(char const *line);
+void p_err(char const *fmt, ...);
+void p_errfile(char const *name, char const *data, usize datalen, usize pos, usize len, char const *fmt, ...);
+void p_showfile(char const *name, char const *data, usize datalen, usize pos, usize len);
 i32 p_cget(void);
 void p_cput(i32 c);
 void p_lex(void);

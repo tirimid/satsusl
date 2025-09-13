@@ -370,6 +370,16 @@ ls_printmodule(FILE *fp, ls_module_t const *m)
 }
 
 void
+ls_cprintmodule(ls_module_t const *m)
+{
+	for (size_t i = 0; i < m->nmods; ++i)
+	{
+		ls_cprintf("[%s]\n", m->names[i]);
+		ls_cprintast(&m->asts[i], &m->lexes[i]);
+	}
+}
+
+void
 ls_destroymodule(ls_module_t *m)
 {
 	for (size_t i = 0; i < m->nmods; ++i)
@@ -642,6 +652,26 @@ ls_printsymtab(FILE *fp, ls_symtab_t const *st)
 	{
 		fprintf(
 			fp,
+			"%s\n"
+			"\ttype   %s\n"
+			"\tmod    %u\n"
+			"\tnode   %u\n"
+			"\tscope  %u\n",
+			st->syms[i],
+			ls_primtypenames[st->types[i]],
+			st->mods[i],
+			st->nodes[i],
+			st->scopes[i]
+		);
+	}
+}
+
+void
+ls_cprintsymtable(ls_symtab_t const *st)
+{
+	for (size_t i = 0; i < st->nsyms; ++i)
+	{
+		ls_cprintf(
 			"%s\n"
 			"\ttype   %s\n"
 			"\tmod    %u\n"

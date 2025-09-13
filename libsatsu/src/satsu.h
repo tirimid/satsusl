@@ -321,6 +321,7 @@ uint64_t ls_fileid(char const *file, bool deref);
 uint64_t ls_alignbatch(uint64_t n);
 void *ls_allocbatch(ls_allocbatch_t *allocs, size_t nallocs);
 void *ls_reallocbatch(void *p, ls_reallocbatch_t *reallocs, size_t nreallocs);
+int32_t ls_cprintf(char const *fmt, ...);
 
 // lex.
 ls_err_t ls_lex(ls_lex_t *out, char const *data, uint32_t len);
@@ -330,6 +331,7 @@ int64_t ls_readtokint(char const *data, ls_tok_t tok);
 double ls_readtokreal(char const *data, ls_tok_t tok);
 void ls_readtokstr(char out[], char const *data, ls_tok_t tok);
 void ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type);
+void ls_cprinttok(ls_tok_t tok, ls_toktype_t type);
 void ls_destroylex(ls_lex_t *l);
 
 // parse.
@@ -337,7 +339,9 @@ ls_err_t ls_parse(ls_ast_t *out, ls_lex_t const *l);
 uint32_t ls_addnode(ls_ast_t *a, ls_nodetype_t type);
 void ls_parentnode(ls_ast_t *a, uint32_t parent, uint32_t child);
 void ls_printast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex);
+void ls_cprintast(ls_ast_t const *ast, ls_lex_t const *lex);
 void ls_printnode(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
+void ls_cprintnode(ls_ast_t const *ast, ls_lex_t const *lex, uint32_t n, uint32_t depth);
 void ls_destroyast(ls_ast_t *a);
 
 // sema.
@@ -345,6 +349,7 @@ ls_module_t ls_createmodule(ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, c
 ls_err_t ls_resolveimports(ls_module_t *m, char const *paths[], size_t npaths);
 void ls_pushmodule(ls_module_t *m, ls_ast_t *a, ls_lex_t *l, char *name, uint64_t id, char *data, uint32_t len);
 void ls_printmodule(FILE *fp, ls_module_t const *m);
+void ls_cprintmodule(ls_module_t const *m);
 void ls_destroymodule(ls_module_t *m);
 ls_err_t ls_globalsymtab(ls_symtab_t *out, ls_module_t const *m);
 ls_err_t ls_sema(ls_module_t const *m);
@@ -356,6 +361,7 @@ void ls_popsymscope(ls_symtab_t *st, uint16_t scope);
 ls_primtype_t ls_typeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
 ls_valuetype_t ls_valuetypeof(ls_module_t const *m, uint32_t mod, ls_symtab_t const *st, uint32_t node);
 void ls_printsymtab(FILE *fp, ls_symtab_t const *st);
+void ls_cprintsymtab(ls_symtab_t const *st);
 
 // exec.
 ls_val_t ls_defaultval(ls_primtype_t type);

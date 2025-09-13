@@ -137,3 +137,26 @@ ls_reallocbatch(void *p, ls_reallocbatch_t *reallocs, size_t nreallocs)
 	
 	return p;
 }
+
+int32_t
+ls_cprintf(char const *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	
+	char msg[512];
+	int32_t rc = vsnprintf(msg, sizeof(msg), fmt, args);
+	if (rc < 0)
+	{
+		return rc;
+	}
+	
+	va_end(args);
+	
+	for (size_t i = 0; msg[i]; ++i)
+	{
+		ls_conf.cput(msg[i]);
+	}
+	
+	return rc;
+}

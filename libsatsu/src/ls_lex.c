@@ -372,6 +372,12 @@ ls_printtok(FILE *fp, ls_tok_t tok, ls_toktype_t type)
 }
 
 void
+ls_cprinttok(ls_tok_t tok, ls_toktype_t type)
+{
+	ls_cprintf("%-16s%u+%u\n", ls_toknames[type], tok.pos, tok.len);
+}
+
+void
 ls_destroylex(ls_lex_t *l)
 {
 	ls_free(l->buf);

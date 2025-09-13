@@ -221,6 +221,12 @@ ls_printast(FILE *fp, ls_ast_t const *ast, ls_lex_t const *lex)
 }
 
 void
+ls_cprintast(ls_ast_t const *ast, ls_lex_t const *lex)
+{
+	ls_cprintnode(ast, lex, 0, 0);
+}
+
+void
 ls_printnode(
 	FILE *fp,
 	ls_ast_t const *ast,
@@ -248,6 +254,35 @@ ls_printnode(
 	for (uint32_t i = 0; i < node.nchildren; ++i)
 	{
 		ls_printnode(fp, ast, lex, node.children[i], depth + 1);
+	}
+}
+
+void
+ls_cprintnode(
+	ls_ast_t const *ast,
+	ls_lex_t const *lex,
+	uint32_t n,
+	uint32_t depth
+)
+{
+	for (uint32_t i = 0; i < depth; ++i)
+	{
+		ls_cprintf("  ");
+	}
+	
+	ls_node_t node = ast->nodes[n];
+	ls_tok_t tok = lex->toks[node.tok];
+	ls_cprintf(
+		"%-12s %-16s %u+%u\n",
+		ls_nodenames[ast->types[n]],
+		ls_toknames[lex->types[node.tok]],
+		tok.pos,
+		tok.len
+	);
+	
+	for (uint32_t i = 0; i < node.nchildren; ++i)
+	{
+		ls_cprintnode(ast, lex, node.children[i], depth + 1);
 	}
 }
 

@@ -42,7 +42,6 @@ main(int argc, char *argv[])
 	{
 		err("main: failed to read file %s - %s!", a_args.infile, e.msg);
 		ls_destroyerr(&e);
-		free(filedata);
 		return 1;
 	}
 	

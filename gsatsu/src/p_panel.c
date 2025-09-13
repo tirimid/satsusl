@@ -129,6 +129,7 @@ p_run(void)
 		z_uitextfield(&io, "Input line", &p_panel.inputlinetf, O_MAXIOLINE);
 		if (z_uibutton(&io, "Send input"))
 		{
+			ls_cprintf("ioenasrt ioarst nieoars toeinars tionearstoe nrst\n");
 			// TODO: implement send input.
 		}
 		
@@ -169,6 +170,104 @@ p_pushoutput(char const *line)
 	}
 }
 
+void
+p_err(char const *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	
+	char msg[512] = "err: ";
+	vsnprintf(&msg[5], sizeof(msg) - 5, fmt, args);
+	ls_cprintf("%s\n", msg);
+	
+	va_end(args);
+}
+
+void
+p_errfile(
+	char const *name,
+	char const *data,
+	usize datalen,
+	usize pos,
+	usize len,
+	char const *fmt,
+	...
+)
+{
+	va_list args;
+	va_start(args, fmt);
+	
+	char msg[512] = "err: ";
+	vsnprintf(&msg[5], sizeof(msg) - 5, fmt, args);
+	ls_cprintf("%s\n", msg);
+	
+	va_end(args);
+	
+	p_showfile(name, data, datalen, pos, len);
+}
+
+void
+p_showfile(
+	char const *name,
+	char const *data,
+	usize datalen,
+	usize pos,
+	usize len
+)
+{
+	u32 line = 1;
+	for (usize i = 0; i < pos; ++i)
+	{
+		line += data[i] == '\n';
+	}
+	
+	usize lbegin = pos;
+	while (lbegin && data[lbegin - 1] != '\n')
+	{
+		--lbegin;
+	}
+	
+	usize lend = pos;
+	while (lend < datalen && data[lend] != '\n')
+	{
+		++lend;
+	}
+	
+	char linum[32] = {0};
+	sprintf(linum, "%u", line);
+	usize linumlen = strlen(linum);
+	
+	ls_cprintf("%s:\n %u |", name, linum);
+	for (usize i = lbegin; i < lend; ++i)
+	{
+		if (data[i] == '\t')
+		{
+			ls_cprintf("  ");
+		}
+		else
+		{
+			p_cput(data[i]);
+		}
+	}
+	
+	ls_cprintf("  ");
+	for (usize i = 0; i <= linumlen; ++i)
+	{
+		p_cput(' ');
+	}
+	p_cput('|');
+	for (usize i = lbegin; i < pos; ++i)
+	{
+		ls_cprintf("%s", data[i] == '\t' ? "  " : " ");
+	}
+	p_cput('^');
+	for (usize i = 1; i < len; ++i)
+	{
+		p_cput('~');
+	}
+	p_cput('\n');
+}
+
 i32
 p_cget(void)
 {
@@ -190,12 +289,21 @@ p_cget(void)
 void
 p_cput(i32 c)
 {
+	// TODO: also write characters to the output file.
+	
 	if (c == '\n')
 	{
-		p_panel.cputbuf[p_panel.cputlen - 1] = 0;
+		p_panel.cputbuf[p_panel.cputlen] = 0;
 		p_panel.cputlen = 0;
 		p_pushoutput(p_panel.cputbuf);
 		return;
+	}
+	
+	if (p_panel.cputlen >= O_MAXIOLINE)
+	{
+		p_panel.cputbuf[p_panel.cputlen] = 0;
+		p_panel.cputlen = 0;
+		p_pushoutput(p_panel.cputbuf);
 	}
 	
 	p_panel.cputbuf[p_panel.cputlen++] = c;
@@ -204,7 +312,40 @@ p_cput(i32 c)
 void
 p_lex(void)
 {
-	// TODO: implement.
+	FILE *fp = fopen(p_panel.inputfile, "rb");
+	if (!fp)
+	{
+		p_err("lex: failed to open file %s!", p_panel.inputfile);
+		return;
+	}
+	
+	char *filedata;
+	u32 filelen;
+	ls_err_t e = ls_readfile(fp, &filedata, &filelen);
+	fclose(fp);
+	if (e.code)
+	{
+		p_err("lex: failed to read file %s - %s!", p_panel.inputfile, e.msg);
+		ls_destroyerr(&e);
+		return;
+	}
+	
+	ls_lex_t lex;
+	e = ls_lex(&lex, filedata, filelen);
+	if (e.code)
+	{
+		p_errfile(p_panel.inputfile, filedata, filelen, e.pos, e.len, "lex: lex failed - %s!", e.msg);
+		ls_destroyerr(&e);
+		free(filedata);
+		return;
+	}
+	
+	for (usize i = 0; i < lex.ntoks; ++i)
+	{
+		ls_cprinttok(lex.toks[i], lex.types[i]);
+	}
+	ls_destroylex(&lex);
+	free(filedata);
 }
 
 void
