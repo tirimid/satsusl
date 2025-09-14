@@ -6,7 +6,7 @@ typedef struct p_panel
 	char inputfile[128];
 	char outputfile[128];
 	char modpaths[O_MAXMODPATHS][128];
-	char inputline[128];
+	char inputline[O_MAXINPUT];
 	char outputlines[O_NOUTPUTLINES][O_MAXIOLINE + 1];
 	
 	// persistent UI elements.
@@ -16,11 +16,15 @@ typedef struct p_panel
 	z_tfdata_t inputlinetf;
 	
 	// cget / cput interface data.
-	char cgetbuf[128];
+	pthread_mutex_t cgetmutex;
+	char cgetbuf[O_MAXINPUT];
 	char cputbuf[O_MAXIOLINE + 1];
 	usize cgetlen;
 	usize cgetidx;
 	usize cputlen;
+	
+	// execution data.
+	bool running;
 } p_panel_t;
 
 extern p_panel_t p_panel;
@@ -33,8 +37,3 @@ void p_errfile(char const *name, char const *data, usize datalen, usize pos, usi
 void p_showfile(char const *name, char const *data, usize datalen, usize pos, usize len);
 i32 p_cget(void);
 void p_cput(i32 c);
-void p_lex(void);
-void p_parse(void);
-void p_import(void);
-void p_sema(void);
-void p_exec(void);

@@ -7,6 +7,7 @@
 #include <time.h>
 
 // system dependencies.
+#include <pthread.h>
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <sys/time.h>

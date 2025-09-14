@@ -17,6 +17,7 @@
 #define O_MAXMODPATHS 7
 #define O_NOUTPUTLINES 26
 #define O_MAXIOLINE 55
+#define O_MAXINPUT 128
 
 // stylistic options.
 #define O_FONTSIZE 22
@@ -25,4 +26,4 @@
 #define O_UITEXTFIELDBAR 3
 
 // color options.
-#define O_BGCOLOR 80, 80, 80, 255
+#define O_BGCOLOR 117, 132, 103, 255

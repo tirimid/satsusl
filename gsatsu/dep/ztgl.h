@@ -18,15 +18,17 @@
 //--------------------------//
 
 #define Z_VERMAJOR 1
-#define Z_VERMINOR 2
+#define Z_VERMINOR 3
 #define Z_VERPATCH 0
 
 //--------//
 // macros //
 //--------//
 
+#ifndef Z_NOGLOBAL
 #define OUT
 #define INOUT
+#endif
 
 // profiling.
 #ifdef Z_PROFILE
@@ -46,15 +48,15 @@
 // library data constants.
 #define Z_MAXRESNAME 15
 #define Z_BATCHALIGN 16
-#define Z_MAXOPTIONKEY 127
-#define Z_MAXOPTIONVALUE 127
+#define Z_MAXOPTIONKEY 128
+#define Z_MAXOPTIONVALUE 128
 #define Z_OPTIONSCAN "%127s = %127[^\r\n]"
 
 //--------------//
 // type aliases //
 //--------------//
 
-#ifndef Z_NOALIAS
+#ifndef Z_NOGLOBAL
 
 typedef int8_t i8;
 typedef int16_t i16;
@@ -75,6 +77,14 @@ typedef double f64;
 //--------------------//
 // enumeration values //
 //--------------------//
+
+typedef enum z_err
+{
+	Z_OK = 0,
+	Z_NOTFOUND,
+	Z_INVALIDFORMAT,
+	Z_INVALIDCONVERSION
+} z_err_t;
 
 typedef enum z_color
 {
@@ -106,8 +116,14 @@ typedef enum z_color
 	Z_TEXTFIELDBARHOVERCOLOR,
 	Z_TEXTFIELDPROMPTCOLOR,
 	Z_TEXTFIELDPROMPTPRESSCOLOR,
-	Z_TEXTFIELDPROMPTHOVERCOLOR
+	Z_TEXTFIELDPROMPTHOVERCOLOR,
+	Z_INACTIVECOLOR
 } z_color_t;
+
+typedef enum z_uiflag
+{
+	Z_INACTIVE = 0x1
+} z_uiflag_t;
 
 typedef enum z_uitype
 {
@@ -158,6 +174,7 @@ typedef union z_uielem
 	struct
 	{
 		u8 type;
+		u16 flags;
 		i32 x, y;
 		i32 w, h;
 	} any;
@@ -165,6 +182,7 @@ typedef union z_uielem
 	struct
 	{
 		u8 type;
+		u16 flags;
 		i32 x, y;
 		i32 w, h;
 		char const *text;
@@ -173,6 +191,7 @@ typedef union z_uielem
 	struct
 	{
 		u8 type;
+		u16 flags;
 		i32 x, y;
 		i32 w, h;
 		char const *text;
@@ -181,6 +200,7 @@ typedef union z_uielem
 	struct
 	{
 		u8 type;
+		u16 flags;
 		i32 x, y;
 		i32 w, h;
 		f32 val;
@@ -190,6 +210,7 @@ typedef union z_uielem
 	struct
 	{
 		u8 type;
+		u16 flags;
 		i32 x, y;
 		i32 w, h;
 		u32 ndraw;
@@ -205,6 +226,7 @@ typedef struct z_ui
 	i32 x, y;
 	TTF_Font *font;
 	SDL_Window const *wnd;
+	bool active;
 } z_ui_t;
 
 typedef struct z_res
@@ -267,11 +289,11 @@ bool z_mreleased(i32 btn);
 bool z_textinput(char ch);
 
 // options.
-i32 z_optraw(OUT char buf[], FILE *fp, char const *key);
-i32 z_optkeycode(OUT SDL_Keycode *k, FILE *fp, char const *key);
-i32 z_optfloat(OUT f64 *f, FILE *fp, char const *key);
-i32 z_optint(OUT i64 *i, FILE *fp, char const *key);
-i32 z_optbool(OUT bool *b, FILE *fp, char const *key);
+z_err_t z_optraw(OUT char buf[], FILE *fp, char const *key);
+z_err_t z_optkeycode(OUT SDL_Keycode *k, FILE *fp, char const *key);
+z_err_t z_optfloat(OUT f64 *f, FILE *fp, char const *key);
+z_err_t z_optint(OUT i64 *i, FILE *fp, char const *key);
+z_err_t z_optbool(OUT bool *b, FILE *fp, char const *key);
 
 // pack.
 i32 z_readpack(OUT z_pack_t *p, u8 *pack, usize size);
@@ -288,6 +310,7 @@ void z_packranges(z_pack_t *p);
 // ui.
 z_ui_t z_beginui(z_uielem_t elems[], usize elemcap, i32 x, i32 y, TTF_Font *font, SDL_Window const *wnd);
 void z_renderui(z_ui_t const *u);
+void z_uiactive(z_ui_t *u, bool active);
 void z_uipad(z_ui_t *u, i32 dx, i32 dy);
 void z_uilabel(z_ui_t *u, char const *text);
 bool z_uibutton(z_ui_t *u, char const *text);
@@ -316,6 +339,7 @@ void *z_reallocbatch(INOUT z_reallocbatch_t *reallocs, usize nreallocs);
 
 // standard library.
 #include <ctype.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <string.h>
@@ -356,7 +380,8 @@ u8 z_defaultcolors[][4] =
 	{255, 255, 255, 255}, // textfield hover bar.
 	{128, 128, 128, 255}, // textfield prompt.
 	{128, 128, 128, 255}, // textfield press prompt.
-	{128, 128, 128, 255} // textfield hover prompt.
+	{128, 128, 128, 255}, // textfield hover prompt.
+	{0, 0, 0, 128} // inactive.
 };
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -520,44 +545,134 @@ z_textinput(char ch)
 }
 // SPDX-License-Identifier: BSD-3-Clause
 
-i32
+z_err_t
 z_optraw(OUT char buf[], FILE *fp, char const *key)
 {
-	// TODO: implement.
-	(void)buf, (void)fp, (void)key;
-	__builtin_unreachable();
+	fseek(fp, 0, SEEK_SET);
+	
+	for (usize line = 0; !feof(fp) && !ferror(fp); ++line)
+	{
+		i32 ch;
+		while (ch = fgetc(fp), ch != EOF && isspace(ch))
+		{
+		}
+		
+		if (ch == '#')
+		{
+			while (ch = fgetc(fp), ch != EOF && ch != '\n')
+			{
+			}
+		}
+		
+		if (ch == '\n' || feof(fp))
+		{
+			continue;
+		}
+		
+		fseek(fp, -1, SEEK_CUR);
+		char keybuf[Z_MAXOPTIONKEY] = {0};
+		if (fscanf(fp, Z_OPTIONSCAN, keybuf, buf) != 2)
+		{
+			return Z_INVALIDFORMAT;
+		}
+		
+		if (!strcmp(buf, "NONE"))
+		{
+			buf[0] = 0;
+		}
+		
+		if (!strcmp(keybuf, key))
+		{
+			return Z_OK;
+		}
+	}
+	
+	return Z_NOTFOUND;
 }
 
-i32
+z_err_t
 z_optkeycode(OUT SDL_Keycode *k, FILE *fp, char const *key)
 {
-	// TODO: implement.
-	(void)k, (void)fp, (void)key;
-	__builtin_unreachable();
+	char buf[Z_MAXOPTIONVALUE] = {0};
+	z_err_t err = z_optraw(buf, fp, key);
+	if (err)
+	{
+		return err;
+	}
+	
+	*k = SDL_GetKeyFromName(buf);
+	if (*k == SDLK_UNKNOWN)
+	{
+		return Z_INVALIDCONVERSION;
+	}
+	
+	return Z_OK;
 }
 
-i32
+z_err_t
 z_optfloat(OUT f64 *f, FILE *fp, char const *key)
 {
-	// TODO: implement.
-	(void)f, (void)fp, (void)key;
-	__builtin_unreachable();
+	char buf[Z_MAXOPTIONVALUE] = {0};
+	z_err_t err = z_optraw(buf, fp, key);
+	if (err)
+	{
+		return err;
+	}
+	
+	errno = 0;
+	*f = strtof(buf, NULL);
+	if (errno)
+	{
+		return Z_INVALIDCONVERSION;
+	}
+	
+	return Z_OK;
 }
 
-i32
+z_err_t
 z_optint(OUT i64 *i, FILE *fp, char const *key)
 {
-	// TODO: implement.
-	(void)i, (void)fp, (void)key;
-	__builtin_unreachable();
+	char buf[Z_MAXOPTIONVALUE] = {0};
+	z_err_t err = z_optraw(buf, fp, key);
+	if (err)
+	{
+		return err;
+	}
+	
+	errno = 0;
+	*i = (i64)strtoll(buf, NULL, 0);
+	if (errno)
+	{
+		return Z_INVALIDCONVERSION;
+	}
+	
+	return Z_OK;
 }
 
-i32
+z_err_t
 z_optbool(OUT bool *b, FILE *fp, char const *key)
 {
-	// TODO: implement.
-	(void)b, (void)fp, (void)key;
-	__builtin_unreachable();
+	char buf[Z_MAXOPTIONVALUE] = {0};
+	z_err_t err = z_optraw(buf, fp, key);
+	if (err)
+	{
+		return err;
+	}
+	
+	if (!strcmp(buf, "true"))
+	{
+		*b = true;
+		return Z_OK;
+	}
+	else if (!strcmp(buf, "false"))
+	{
+		*b = false;
+		return Z_OK;
+	}
+	else
+	{
+		return Z_INVALIDCONVERSION;
+	}
 }
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -659,7 +774,8 @@ z_beginui(
 		.x = x,
 		.y = y,
 		.font = font,
-		.wnd = wnd
+		.wnd = wnd,
+		.active = true
 	};
 }
 
@@ -703,6 +819,12 @@ z_renderui(z_ui_t const *u)
 	{
 		i32 x = u->elems[i].any.x, y = u->elems[i].any.y;
 		i32 w = u->elems[i].any.w, h = u->elems[i].any.h;
+		
+		if (u->elems[i].any.flags & Z_INACTIVE)
+		{
+			z_conf.renderrect(x, y, w, h, Z_INACTIVECOLOR);
+			continue;
+		}
 		
 		if (u->elems[i].any.type == Z_LABEL)
 		{
@@ -837,6 +959,12 @@ z_renderui(z_ui_t const *u)
 }
 
 void
+z_uiactive(z_ui_t *u, bool active)
+{
+	u->active = active;
+}
+
+void
 z_uipad(z_ui_t *u, i32 dx, i32 dy)
 {
 	u->x += dx;
@@ -859,6 +987,7 @@ z_uilabel(z_ui_t *u, char const *text)
 		.label =
 		{
 			.type = Z_LABEL,
+			.flags = Z_INACTIVE * !u->active,
 			.x = u->x,
 			.y = u->y,
 			.w = w,
@@ -884,16 +1013,19 @@ z_uibutton(z_ui_t *u, char const *text)
 	w += 2 * z_conf.uipad;
 	h += 2 * z_conf.uipad;
 	
-	i32 mx, my;
-	z_mpos(u->wnd, &mx, &my);
-	
-	if (z_mreleased(SDL_BUTTON_LEFT)
-		&& mx >= u->x
-		&& my >= u->y
-		&& mx < u->x + w
-		&& my < u->y + h)
+	if (u->active)
 	{
-		state = true;
+		i32 mx, my;
+		z_mpos(u->wnd, &mx, &my);
+		
+		if (z_mreleased(SDL_BUTTON_LEFT)
+			&& mx >= u->x
+			&& my >= u->y
+			&& mx < u->x + w
+			&& my < u->y + h)
+		{
+			state = true;
+		}
 	}
 	
 	u->elems[u->nelems++] = (z_uielem_t)
@@ -901,6 +1033,7 @@ z_uibutton(z_ui_t *u, char const *text)
 		.button =
 		{
 			.type = Z_BUTTON,
+			.flags = Z_INACTIVE * !u->active,
 			.x = u->x,
 			.y = u->y,
 			.w = w,
@@ -928,27 +1061,31 @@ z_uislider(z_ui_t *u, char const *text, INOUT f32 *val)
 	w += 2 * z_conf.uipad;
 	h += 2 * z_conf.uipad;
 	
-	i32 mx, my;
-	z_mpos(u->wnd, &mx, &my);
-	
-	if (z_mreleased(SDL_BUTTON_LEFT)
-		&& mx >= u->x
-		&& my >= u->y
-		&& mx < u->x + w
-		&& my < u->y + h)
+	if (u->active)
 	{
-		*val = (f64)(mx - u->x) / w;
-		state = true;
+		i32 mx, my;
+		z_mpos(u->wnd, &mx, &my);
+		
+		if (z_mreleased(SDL_BUTTON_LEFT)
+			&& mx >= u->x
+			&& my >= u->y
+			&& mx < u->x + w
+			&& my < u->y + h)
+		{
+			*val = (f64)(mx - u->x) / w;
+			state = true;
+		}
+		
+		*val = *val < 0.0f ? 0.0f : *val;
+		*val = *val > 1.0f ? 1.0f : *val;
 	}
-	
-	*val = *val < 0.0f ? 0.0f : *val;
-	*val = *val > 1.0f ? 1.0f : *val;
 	
 	u->elems[u->nelems++] = (z_uielem_t)
 	{
 		.slider =
 		{
 			.type = Z_SLIDER,
+			.flags = Z_INACTIVE * !u->active,
 			.x = u->x,
 			.y = u->y,
 			.w = w,
@@ -977,92 +1114,95 @@ z_uitextfield(z_ui_t *u, char const *text, INOUT z_tfdata_t *tfdata, u32 ndraw)
 	i32 w = ndraw * chw + 2 * z_conf.uipad;
 	i32 h = chh + 2 * z_conf.uipad;
 	
-	if (z_mreleased(SDL_BUTTON_LEFT))
+	if (u->active)
 	{
-		i32 mx, my;
-		z_mpos(u->wnd, &mx, &my);
-		
-		if (mx >= u->x && my >= u->y && mx < u->x + w && my < u->y + h)
+		if (z_mreleased(SDL_BUTTON_LEFT))
 		{
-			tfdata->sel = true;
-		}
-		else
-		{
-			tfdata->sel = false;
-		}
-	}
-	
-	if (tfdata->sel)
-	{
-		if (z_kpressed(SDLK_LEFT))
-		{
-			tfdata->csr -= tfdata->csr > 0;
-			tfdata->first -= tfdata->csr < tfdata->first;
-		}
-		
-		if (z_kpressed(SDLK_RIGHT))
-		{
-			tfdata->csr += tfdata->csr < tfdata->len;
-			tfdata->first += tfdata->csr - tfdata->first >= ndraw;
-		}
-		
-		if (z_kpressed(SDLK_UP))
-		{
-			tfdata->csr = 0;
-			tfdata->first = 0;
-		}
-		
-		if (z_kpressed(SDLK_DOWN))
-		{
-			tfdata->csr = tfdata->len;
-			tfdata->first = 0;
-			while (tfdata->csr - tfdata->first > ndraw)
+			i32 mx, my;
+			z_mpos(u->wnd, &mx, &my);
+			
+			if (mx >= u->x && my >= u->y && mx < u->x + w && my < u->y + h)
 			{
-				++tfdata->first;
+				tfdata->sel = true;
+			}
+			else
+			{
+				tfdata->sel = false;
 			}
 		}
 		
-		for (u8 i = 0; i < 128; ++i)
+		if (tfdata->sel)
 		{
-			if (tfdata->len >= tfdata->cap + 1)
+			if (z_kpressed(SDLK_LEFT))
 			{
-				break;
+				tfdata->csr -= tfdata->csr > 0;
+				tfdata->first -= tfdata->csr < tfdata->first;
 			}
 			
-			if (!isprint(i))
+			if (z_kpressed(SDLK_RIGHT))
 			{
-				continue;
+				tfdata->csr += tfdata->csr < tfdata->len;
+				tfdata->first += tfdata->csr - tfdata->first >= ndraw;
 			}
 			
-			if (z_textinput(i))
+			if (z_kpressed(SDLK_UP))
+			{
+				tfdata->csr = 0;
+				tfdata->first = 0;
+			}
+			
+			if (z_kpressed(SDLK_DOWN))
+			{
+				tfdata->csr = tfdata->len;
+				tfdata->first = 0;
+				while (tfdata->csr - tfdata->first > ndraw)
+				{
+					++tfdata->first;
+				}
+			}
+			
+			for (u8 i = 0; i < 128; ++i)
+			{
+				if (tfdata->len >= tfdata->cap + 1)
+				{
+					break;
+				}
+				
+				if (!isprint(i))
+				{
+					continue;
+				}
+				
+				if (z_textinput(i))
+				{
+					memmove(
+						&tfdata->buf[tfdata->csr + 1],
+						&tfdata->buf[tfdata->csr],
+						tfdata->len - tfdata->csr
+					);
+					
+					++tfdata->csr;
+					tfdata->first += tfdata->csr - tfdata->first >= ndraw;
+					tfdata->buf[tfdata->csr - 1] = i;
+					++tfdata->len;
+					tfdata->buf[tfdata->len] = 0;
+				}
+			}
+			
+			if (z_kpressed(SDLK_BACKSPACE) && tfdata->csr)
 			{
 				memmove(
-					&tfdata->buf[tfdata->csr + 1],
+					&tfdata->buf[tfdata->csr - 1],
 					&tfdata->buf[tfdata->csr],
 					tfdata->len - tfdata->csr
 				);
 				
-				++tfdata->csr;
-				tfdata->first += tfdata->csr - tfdata->first >= ndraw;
-				tfdata->buf[tfdata->csr - 1] = i;
-				++tfdata->len;
+				--tfdata->csr;
+				tfdata->first -= tfdata->csr < tfdata->first;
+				
+				--tfdata->len;
 				tfdata->buf[tfdata->len] = 0;
 			}
-		}
-		
-		if (z_kpressed(SDLK_BACKSPACE) && tfdata->csr)
-		{
-			memmove(
-				&tfdata->buf[tfdata->csr - 1],
-				&tfdata->buf[tfdata->csr],
-				tfdata->len - tfdata->csr
-			);
-			
-			--tfdata->csr;
-			tfdata->first -= tfdata->csr < tfdata->first;
-			
-			--tfdata->len;
-			tfdata->buf[tfdata->len] = 0;
 		}
 	}
 	
@@ -1071,6 +1211,7 @@ z_uitextfield(z_ui_t *u, char const *text, INOUT z_tfdata_t *tfdata, u32 ndraw)
 		.textfield =
 		{
 			.type = Z_TEXTFIELD,
+			.flags = Z_INACTIVE * !u->active,
 			.x = u->x,
 			.y = u->y,
 			.w = w,
